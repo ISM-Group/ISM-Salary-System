@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const dailySalaryReleases_controller_1 = require("../controllers/dailySalaryReleases.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const rbac_middleware_1 = require("../middleware/rbac.middleware");
+const types_1 = require("../types");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticate);
+router.use((0, rbac_middleware_1.authorize)(types_1.UserRole.ADMIN));
+router.get('/', dailySalaryReleases_controller_1.getDailySalaryReleases);
+exports.default = router;

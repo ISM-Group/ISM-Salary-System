@@ -1,0 +1,18 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const employees_controller_1 = require("../controllers/employees.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const rbac_middleware_1 = require("../middleware/rbac.middleware");
+const types_1 = require("../types");
+const auditLog_middleware_1 = require("../middleware/auditLog.middleware");
+const auditLog_1 = require("../utils/auditLog");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticate);
+router.get('/', employees_controller_1.getEmployees);
+router.get('/:id', employees_controller_1.getEmployee);
+router.get('/:id/profile', employees_controller_1.getEmployeeProfile);
+router.post('/', (0, rbac_middleware_1.authorize)(types_1.UserRole.ADMIN), (0, auditLog_middleware_1.auditLog)('employees', auditLog_1.AuditAction.CREATE), employees_controller_1.createEmployee);
+router.put('/:id', (0, rbac_middleware_1.authorize)(types_1.UserRole.ADMIN), (0, auditLog_middleware_1.auditLog)('employees', auditLog_1.AuditAction.UPDATE), employees_controller_1.updateEmployee);
+router.delete('/:id', (0, rbac_middleware_1.authorize)(types_1.UserRole.ADMIN), (0, auditLog_middleware_1.auditLog)('employees', auditLog_1.AuditAction.DELETE), employees_controller_1.deleteEmployee);
+exports.default = router;

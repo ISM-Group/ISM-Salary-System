@@ -4,13 +4,6 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -20,13 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Eye, Pencil, MoreHorizontal, Loader2 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Plus, Search, Eye, Pencil, Loader2, Trash2 } from 'lucide-react';
 import { employeesAPI, departmentsAPI } from '@/lib/api';
 
 export function EmployeesPage() {
@@ -44,7 +31,7 @@ export function EmployeesPage() {
   });
 
   // Fetch employees
-  const { data: employeesData, isLoading } = useQuery({
+  const { data: employeesData, isLoading, refetch } = useQuery({
     queryKey: ['employees', departmentFilter, statusFilter],
     queryFn: async () => {
       const params: any = {};
@@ -89,36 +76,34 @@ export function EmployeesPage() {
                 className="pl-9"
               />
             </div>
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-full sm:w-32">
-                <SelectValue placeholder="Department" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Depts</SelectItem>
-                {departments.map((dept: any) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-28">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
-              </SelectContent>
-            </Select>
+            <select
+              value={departmentFilter}
+              onChange={(e) => setDepartmentFilter(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full sm:w-32"
+            >
+              <option value="all">All Depts</option>
+              {departments.map((dept: any) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full sm:w-28"
+            >
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
           </div>
-          <Button asChild variant="accent" className="w-full sm:w-auto">
-            <Link to="/admin/employees/new">
+          <Link to="/admin/employees/new">
+            <Button variant="accent" className="w-full sm:w-auto">
               <Plus className="h-4 w-4" />
               Add Employee
-            </Link>
-          </Button>
+            </Button>
+          </Link>
         </div>
 
         {/* Table */}
@@ -160,28 +145,30 @@ export function EmployeesPage() {
                         {employee.isActive ? 'Active' : 'Inactive'}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link to={`/admin/employees/${employee.id}`}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              View Profile
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link to={`/admin/employees/${employee.id}/edit`}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </Link>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <TableCell className="flex gap-2">
+                      <Link to={`/admin/employees/${employee.id}`}>
+                        <Button variant="ghost" size="icon">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Link to={`/admin/employees/${employee.id}/edit`}>
+                        <Button variant="ghost" size="icon">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={async () => {
+                          if (!window.confirm('Delete this employee?')) {
+                            return;
+                          }
+                          await employeesAPI.delete(employee.id);
+                          await refetch();
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))

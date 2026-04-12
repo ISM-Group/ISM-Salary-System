@@ -1,0 +1,17 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const loans_controller_1 = require("../controllers/loans.controller");
+const auth_middleware_1 = require("../middleware/auth.middleware");
+const rbac_middleware_1 = require("../middleware/rbac.middleware");
+const types_1 = require("../types");
+const auditLog_middleware_1 = require("../middleware/auditLog.middleware");
+const auditLog_1 = require("../utils/auditLog");
+const router = (0, express_1.Router)();
+router.use(auth_middleware_1.authenticate);
+router.get('/', loans_controller_1.getLoans);
+router.get('/:id', loans_controller_1.getLoan);
+router.post('/', (0, rbac_middleware_1.authorize)(types_1.UserRole.ADMIN), (0, auditLog_middleware_1.auditLog)('loans', auditLog_1.AuditAction.CREATE), loans_controller_1.createLoan);
+router.put('/:id', (0, rbac_middleware_1.authorize)(types_1.UserRole.ADMIN), (0, auditLog_middleware_1.auditLog)('loans', auditLog_1.AuditAction.UPDATE), loans_controller_1.updateLoan);
+router.put('/installments/:id', (0, rbac_middleware_1.authorize)(types_1.UserRole.ADMIN), (0, auditLog_middleware_1.auditLog)('loan_installments', auditLog_1.AuditAction.UPDATE), loans_controller_1.updateInstallment);
+exports.default = router;
