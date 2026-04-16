@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -20,24 +19,6 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   ArrowLeft,
   Calendar,
   DollarSign,
@@ -53,14 +34,10 @@ import {
 } from 'lucide-react';
 import { employeesAPI } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
 
 export function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const { user } = useAuth();
 
   const { data: profileData, isLoading, refetch } = useQuery({
     queryKey: ['employee-profile', id],
@@ -118,12 +95,12 @@ export function EmployeeProfilePage() {
                 </CardDescription>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" asChild>
-                  <Link to={`/admin/employees/${id}/edit`}>
+                <Link to={`/admin/employees/${id}/edit`}>
+                  <Button variant="outline">
                     <Edit className="mr-2 h-4 w-4" />
                     Edit Profile
-                  </Link>
-                </Button>
+                  </Button>
+                </Link>
               </div>
             </div>
           </CardHeader>
@@ -296,12 +273,12 @@ export function EmployeeProfilePage() {
                   </CardTitle>
                   <CardDescription>Active loans and repayment schedule</CardDescription>
                 </div>
-                <Button variant="outline" asChild>
-                  <Link to="/admin/loans">
+                <Link to="/admin/loans">
+                  <Button variant="outline">
                     <Plus className="mr-2 h-4 w-4" />
                     Add Loan
-                  </Link>
-                </Button>
+                  </Button>
+                </Link>
               </div>
             </CardHeader>
             <CardContent>
@@ -406,12 +383,12 @@ export function EmployeeProfilePage() {
                 </CardTitle>
                 <CardDescription>Last 3 months attendance statistics</CardDescription>
               </div>
-              <Button variant="outline" asChild>
-                <Link to={`/admin/employees/${id}/attendance/calendar`}>
+              <Link to={`/admin/employees/${id}/attendance/calendar`}>
+                <Button variant="outline">
                   View Calendar
                   <ExternalLink className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             </div>
           </CardHeader>
           <CardContent>
@@ -441,4 +418,3 @@ export function EmployeeProfilePage() {
     </MainLayout>
   );
 }
-

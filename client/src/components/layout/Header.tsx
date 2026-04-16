@@ -2,10 +2,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Bell, Search, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Sidebar } from './Sidebar';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -50,7 +48,7 @@ export function Header({ title, description }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
   const location = useLocation();
-  const navItems = user?.role === 'admin' ? adminNavItems : employeeNavItems;
+  const navItems = user?.role === 'ADMIN' ? adminNavItems : employeeNavItems;
 
   return (
     <>
@@ -100,10 +98,14 @@ export function Header({ title, description }: HeaderProps) {
 
       {/* Mobile Sidebar */}
       {isMobile && (
-        <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-          <SheetContent side="left" className="w-64 p-0">
+        <div className={cn('fixed inset-0 z-50 lg:hidden', isMobileMenuOpen ? 'block' : 'hidden')}>
+          <button
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-label="Close menu"
+          />
+          <div className="relative h-full w-64 bg-sidebar-background">
             <div className="flex h-full flex-col">
-              {/* Logo */}
               <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
                 <div className="flex items-center gap-2">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
@@ -113,7 +115,6 @@ export function Header({ title, description }: HeaderProps) {
                 </div>
               </div>
 
-              {/* Navigation */}
               <nav className="flex-1 space-y-1 overflow-y-auto p-3">
                 {navItems.map((item) => {
                   const isActive = location.pathname === item.href || 
@@ -138,7 +139,6 @@ export function Header({ title, description }: HeaderProps) {
                 })}
               </nav>
 
-              {/* User section */}
               <div className="border-t border-sidebar-border p-3">
                 <div className="mb-3 px-3">
                   <p className="text-sm font-medium text-sidebar-foreground">{user?.full_name}</p>
@@ -157,8 +157,8 @@ export function Header({ title, description }: HeaderProps) {
                 </Button>
               </div>
             </div>
-          </SheetContent>
-        </Sheet>
+          </div>
+        </div>
       )}
     </>
   );

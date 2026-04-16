@@ -32,10 +32,10 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Unauthorized - clear auth and redirect to login
       // Only redirect if not already on login page to avoid loops
-      if (window.location.pathname !== '/auth/login') {
+      if (window.location.pathname !== '/login') {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/auth/login';
+        window.location.href = '/login';
       }
     }
     return Promise.reject(error);
@@ -44,6 +44,10 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
+  register: async (payload: { username: string; password: string; fullName: string; role?: 'ADMIN' | 'EMPLOYEE' }) => {
+    const response = await api.post('/auth/register', payload);
+    return response.data;
+  },
   login: async (username: string, password: string) => {
     const response = await api.post('/auth/login', { username, password });
     return response.data;
@@ -107,6 +111,10 @@ export const employeesAPI = {
       ? { headers: { 'Content-Type': 'multipart/form-data' } }
       : {};
     const response = await api.put(`/employees/${id}`, data, config);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/employees/${id}`);
     return response.data;
   },
   getProfile: async (id: string) => {
@@ -221,6 +229,10 @@ export const advanceSalariesAPI = {
     });
     return response.data;
   },
+  getByEmployee: async (employeeId: string) => {
+    const response = await api.get(`/advance-salaries/employee/${employeeId}`);
+    return response.data;
+  },
 };
 
 // Salary API
@@ -251,6 +263,10 @@ export const departmentsAPI = {
   },
   update: async (id: string, data: unknown) => {
     const response = await api.put(`/departments/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/departments/${id}`);
     return response.data;
   },
 };
@@ -296,4 +312,3 @@ export const auditLogsAPI = {
 };
 
 export default api;
-

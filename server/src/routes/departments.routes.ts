@@ -4,6 +4,7 @@ import {
   getDepartment,
   createDepartment,
   updateDepartment,
+  deleteDepartment,
 } from '../controllers/departments.controller';
 import { authenticate } from '../middleware/auth.middleware';
 import { authorize } from '../middleware/rbac.middleware';
@@ -23,6 +24,6 @@ router.get('/', getDepartments);
 router.get('/:id', getDepartment);
 router.post('/', auditLog('departments', AuditAction.CREATE), createDepartment);
 router.put('/:id', auditLog('departments', AuditAction.UPDATE), updateDepartment);
+router.delete('/:id', auditLog('departments', AuditAction.DELETE), deleteDepartment);
 
 export default router;
-
