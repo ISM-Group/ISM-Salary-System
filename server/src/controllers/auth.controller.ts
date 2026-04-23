@@ -14,6 +14,9 @@ type UserRow = {
   is_active: number;
 };
 
+/**
+ * Signs a JWT token for the given user payload.
+ */
 const signToken = (user: { id: string; username: string; full_name: string; role: UserRole }): string => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
@@ -25,7 +28,17 @@ const signToken = (user: { id: string; username: string; full_name: string; role
   });
 };
 
-export const register = async (req: Request, res: Response): Promise<void> => {
+// PUBLIC_INTERFACE
+/**
+ * Register a new user.
+ * Only ADMIN users can register new accounts.
+ * Accepts username, password, fullName, and optional role (ADMIN or MANAGER).
+ * Defaults to MANAGER when role is not specified or is invalid.
+ *
+ * @route POST /api/auth/register
+ * @access ADMIN only (enforced via route-level middleware)
+ */
+export const register = async (req: AuthRequest, res: Response): Promise<void> => {
   const { username, password, fullName, role } = req.body as {
     username?: string;
     password?: string;
@@ -51,13 +64,25 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
   const id = generateId();
   const hash = await bcrypt.hash(password, 10);
-  const userRole = role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.EMPLOYEE;
+  // Default to MANAGER; only allow ADMIN when explicitly specified
+  const userRole = role === UserRole.ADMIN ? UserRole.ADMIN : UserRole.MANAGER;
 
   await execute(
     `INSERT INTO users (id, username, password_hash, full_name, role, is_active, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, TRUE, NOW(), NOW())`,
     [id, username, hash, fullName, userRole]
   );
+
+  // Write audit log for user registration
+  await writeAuditLog({
+    tableName: 'users',
+    action: AuditAction.CREATE,
+    changedBy: req.user?.id,
+    recordId: id,
+    newData: { username, fullName, role: userRole },
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'] || '',
+  });
 
   const token = signToken({ id, username, full_name: fullName, role: userRole });
   res.status(201).json({
@@ -68,6 +93,14 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   });
 };
 
+// PUBLIC_INTERFACE
+/**
+ * Login an existing user.
+ * Validates username and password, returns a JWT token on success.
+ *
+ * @route POST /api/auth/login
+ * @access Public
+ */
 export const login = async (req: Request, res: Response): Promise<void> => {
   const { username, password } = req.body as { username?: string; password?: string };
 
@@ -122,6 +155,13 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   });
 };
 
+// PUBLIC_INTERFACE
+/**
+ * Get the currently authenticated user's information.
+ *
+ * @route GET /api/auth/me
+ * @access Authenticated
+ */
 export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<void> => {
   if (!req.user) {
     res.status(401).json({ error: 'Unauthorized' });
@@ -131,6 +171,13 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<v
   res.json({ data: req.user });
 };
 
+// PUBLIC_INTERFACE
+/**
+ * Logout the current user. Writes an audit log entry.
+ *
+ * @route POST /api/auth/logout
+ * @access Authenticated
+ */
 export const logout = async (req: AuthRequest, res: Response): Promise<void> => {
   if (req.user) {
     await writeAuditLog({

@@ -1,11 +1,22 @@
+/**
+ * Dashboard Routes
+ *
+ * Provides aggregated statistics and analytics data.
+ * - GET /stats                      — Get overview statistics
+ * - GET /salary-trends              — Get salary trends over months
+ * - GET /department-distribution    — Get employee count by department
+ * - GET /attendance-stats           — Get attendance statistics
+ * - GET /loan-breakdown             — Get loan breakdown by status
+ * - GET /recent-activity            — Get recent audit log activity
+ */
 import { Router } from 'express';
 import {
-  getAttendanceStats,
+  getStats,
+  getSalaryTrends,
   getDepartmentDistribution,
+  getAttendanceStats,
   getLoanBreakdown,
   getRecentActivity,
-  getSalaryTrends,
-  getStats,
 } from '../controllers/dashboard.controller';
 import { authenticate } from '../middleware/auth.middleware';
 

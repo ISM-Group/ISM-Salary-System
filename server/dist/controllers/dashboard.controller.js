@@ -113,12 +113,12 @@ exports.getDepartmentDistribution = getDepartmentDistribution;
 const getAttendanceStats = async (req, res) => {
     try {
         const months = parseInt(req.query.months, 10) || 6;
+        // Only PRESENT and ABSENT statuses are tracked
         const sql = `
       SELECT 
         DATE_FORMAT(date, '%Y-%m') as month,
         SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as present,
         SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absent,
-        SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as late,
         COUNT(*) as total
       FROM attendance
       WHERE date >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
@@ -131,7 +131,6 @@ const getAttendanceStats = async (req, res) => {
                 month: s.month,
                 present: parseInt(s.present || 0),
                 absent: parseInt(s.absent || 0),
-                late: parseInt(s.late || 0),
                 total: parseInt(s.total || 0),
             })),
         });

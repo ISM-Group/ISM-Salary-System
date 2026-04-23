@@ -1,28 +1,12 @@
-# ISM-Salary-System - Server Architecture Analysis
+# ISM Salary System — Server Architecture
 
 ## Overview
-A Node.js/Express-based REST API for salary management system with MySQL database, built with TypeScript and featuring multi-role access control (RBAC), audit logging, and comprehensive salary calculation.
 
-## Current Status: 🔴 CRITICAL - PRODUCTION NOT READY
+The server is a Node.js/Express REST API built with TypeScript for the ISM Salary Management System. It provides JWT-based authentication, role-based access control (RBAC), Zod input validation, audit logging, and connects to a MySQL 8+ database via connection pooling. The server implements 13 API route modules covering all salary management operations.
 
-### Critical Issues Found:
-1. **Missing Configuration Files** ⛔
-   - No `package.json` in server root
-   - No `tsconfig.json` for TypeScript configuration
-   - No `.env.example` for environment variables
-   - Cannot install dependencies or build project
-
-2. **npm Install Failed** ⛔
-   - Terminal log shows: `npm error code ENOENT` - Cannot find package.json
-   - Exit code 254 (package.json not found error)
-
-3. **Missing Core Utilities & Middleware** ⛔
-   - Referenced but not provided: `utils/db.ts` (database query functions)
-   - Referenced but not provided: `middleware/auth.middleware`
-   - Referenced but not provided: `middleware/rbac.middleware`
-   - Referenced but not provided: `middleware/auditLog.middleware`
-   - Referenced but not provided: `controllers/auth.controller.sql`
-   - Referenced but not provided: Various other controllers
+**Build status**: ✅ Builds and runs successfully  
+**Dev server**: `npm run dev` (nodemon + ts-node) on port 5001  
+**Production build**: `npm run build` compiles to `dist/`; `npm start` runs the compiled JS
 
 ---
 
@@ -30,374 +14,313 @@ A Node.js/Express-based REST API for salary management system with MySQL databas
 
 ```
 server/
-├── src/
-│   ├── controllers/
-│   │   ├── dashboard.controller.ts          # Dashboard analytics
-│   │   ├── roles.controller.ts              # Role management
-│   │   └── (many others referenced but not found)
-│   ├── routes/
-│   │   ├── auth.routes.ts                   # Authentication endpoints
-│   │   ├── departments.routes.ts            # Department CRUD
-│   │   ├── advanceSalaries.routes.ts        # Advance salary management
-│   │   ├── auditLogs.routes.ts              # Audit log queries
-│   │   ├── (many others referenced but not found)
-│   ├── middleware/
-│   │   ├── auth.middleware          # ⛔ MISSING (referenced)
-│   │   ├── rbac.middleware          # ⛔ MISSING (referenced)
-│   │   └── auditLog.middleware      # ⛔ MISSING (referenced)
-│   ├── utils/
-│   │   ├── db.ts                    # ⛔ MISSING (referenced)
-│   │   └── auditLog.ts              # ⛔ MISSING
-│   ├── types/
-│   │   └── (index.ts)               # ⛔ MISSING (referenced)
-│   └── app.ts                       # Express app entry point
-├── RUN_IN_MYSQL_WORKBENCH.sql       # Database migration script
-├── UPDATE_TO_DAILY_WAGE.sql         # Salary type migration script
-├── src/database/
-│   ├── add_role_levels.sql          # Role levels setup
-│   └── migrations/
-│       └── check_migration_status.sql
-├── package.json                     # ⛔ MISSING - CRITICAL
-├── tsconfig.json                    # ⛔ MISSING - CRITICAL
-├── .env.example                     # ⛔ MISSING
-└── .env.production                  # ⛔ MISSING
+├── package.json                     # Dependencies and scripts
+├── tsconfig.json                    # TypeScript configuration
+├── RUN_IN_MYSQL_WORKBENCH.sql       # Legacy migration script
+├── UPDATE_TO_DAILY_WAGE.sql         # Legacy salary type migration
+└── src/
+    ├── server.ts                    # HTTP server entry point (port binding)
+    ├── app.ts                       # Express app configuration and middleware stack
+    ├── types/
+    │   └── index.ts                 # UserRole enum, AuthUser, AuthRequest interfaces
+    ├── validation/
+    │   └── schemas.ts               # Zod validation schemas for all endpoints
+    ├── utils/
+    │   ├── db.ts                    # MySQL connection pool, query/execute helpers, UUID generation
+    │   └── auditLog.ts              # AuditAction enum and writeAuditLog function
+    ├── middleware/
+    │   ├── auth.middleware.ts        # JWT token verification and user attachment
+    │   ├── rbac.middleware.ts        # Role-based access control
+    │   ├── auditLog.middleware.ts    # Automatic audit trail for mutations
+    │   └── validate.middleware.ts    # Zod schema validation for body and query
+    ├── controllers/
+    │   ├── auth.controller.ts        # Register, login, logout, getCurrentUser
+    │   ├── employees.controller.ts   # Employee CRUD with profile aggregation
+    │   ├── departments.controller.ts # Department CRUD with FK protection
+    │   ├── roles.controller.ts       # Role CRUD with department association
+    │   ├── attendance.controller.ts  # Attendance CRUD, daily view, calendar
+    │   ├── loans.controller.ts       # Loan CRUD, installments, settle, extend
+    │   ├── advanceSalaries.controller.ts # Advance salary with approval workflow
+    │   ├── salary.controller.ts      # Salary calculation (FIXED + DAILY_WAGE)
+    │   ├── salaryHistory.controller.ts # Employee salary change tracking
+    │   ├── holidays.controller.ts    # Holiday CRUD with scoping
+    │   ├── dailySalaryReleases.controller.ts # Daily release generation and payouts
+    │   ├── dashboard.controller.ts   # Dashboard analytics and statistics
+    │   └── auditLogs.controller.ts   # Audit log retrieval with passkey gate
+    ├── routes/
+    │   ├── auth.routes.ts
+    │   ├── employees.routes.ts
+    │   ├── departments.routes.ts
+    │   ├── roles.routes.ts
+    │   ├── attendance.routes.ts
+    │   ├── loans.routes.ts
+    │   ├── advanceSalaries.routes.ts
+    │   ├── salary.routes.ts
+    │   ├── salaryHistory.routes.ts
+    │   ├── holidays.routes.ts
+    │   ├── dailySalaryReleases.routes.ts
+    │   ├── dashboard.routes.ts
+    │   └── auditLogs.routes.ts
+    └── database/
+        ├── add_role_levels.sql
+        ├── setup/
+        │   ├── 01_create_schema.sql   # Full schema creation (14 tables)
+        │   ├── 02_seed_sri_lanka_data.sql # Sri Lanka test data
+        │   └── README.md
+        └── migrations/
+            ├── 006_daily_salary_releases.sql
+            ├── 007_loans_daily_repayment.sql
+            ├── 008_advance_salaries_status.sql
+            ├── 009_holiday_employee_scoping.sql
+            ├── 010_role_system_update.sql
+            ├── 011_remove_half_day.sql
+            ├── 012_audit_log_description.sql
+            ├── 013_loan_installment_paid_at.sql
+            └── check_migration_status.sql
 ```
 
 ---
 
-## Application Entry Point (`src/app.ts`)
+## Application Entry Point
 
-### Express Configuration
-- **Framework**: Express.js with TypeScript
-- **Environment**: Uses `dotenv` to load environment variables
-- **CORS**: Dynamic origin validation
-  - Development: Allows all origins
-  - Production: Allows only specified `allowedOrigins`
-  - Whitelist: `http://localhost:3000`, `http://localhost:8080`, `${process.env.CLIENT_URL}`
-  
-### Middleware Stack
-```
-CORS → express.json() → express.urlencoded() → cookieParser()
-```
+### server.ts
 
-### Routes Registered
-1. `/api/auth` - Authentication
-2. `/api/departments` - Department management
-3. `/api/roles` - Role management
-4. `/api/employees` - Employee CRUD
-5. `/api/attendance` - Attendance tracking
-6. `/api/loans` - Loan management
-7. `/api/advance-salaries` - Advance salary requests
-8. `/api/salary` - Salary calculations
-9. `/api/salary-history` - Salary history/records
-10. `/api/holidays` - Holiday management
-11. `/api/audit-logs` - Audit trail
-12. `/api/dashboard` - Dashboard analytics
-13. `/api/daily-releases` - Daily release reports
+Creates an HTTP server that listens on the port specified by the `PORT` environment variable (default: 5001). The server is a thin wrapper around the Express `app` module.
 
-### Error Handling
-- Global error handler: catches uncaught errors and returns 500 with generic message
-- **ISSUE**: No proper error logging or error classification
-- 404 handler for undefined routes
+### app.ts — Middleware Stack
+
+The Express application configures the following middleware in order:
+
+1. **Helmet** — Security headers with `contentSecurityPolicy` disabled and `crossOriginResourcePolicy` set to `cross-origin`
+2. **General rate limiter** — 300 requests per 15-minute window for all endpoints
+3. **Auth rate limiter** — 20 requests per 15-minute window, applied specifically to `/api/auth` routes
+4. **CORS** — Environment-aware origin handling:
+   - Development: allows all origins
+   - Production: restricts to `http://localhost:3000`, `http://localhost:8080`, and the `CLIENT_URL` env var
+   - Supports credentials, standard HTTP methods, and common headers
+5. **Morgan** — Request logging (`combined` format in production, `dev` format otherwise)
+6. **Body parsing** — JSON and URL-encoded with a 1MB size limit
+7. **Cookie parser** — For cookie-based interactions
 
 ### Health Check
-- `GET /health` returns `{ status: 'ok', timestamp: ISO_STRING }`
+
+`GET /health` performs a database connectivity check (`SELECT 1`). Returns `200 { status: "ok", database: "connected" }` when healthy, or `503 { status: "degraded", database: "disconnected" }` when the database is unreachable.
+
+### Error Handling
+
+The application implements structured error handling:
+
+- **404 handler**: Returns `{ error: "Route not found", path, method }` for undefined routes
+- **CORS errors**: Returns `403 { error: "CORS: Origin not allowed" }` for blocked origins
+- **JSON parse errors**: Returns `400 { error: "Invalid JSON in request body" }` for malformed JSON
+- **Generic errors**: Returns `500 { error: "Internal server error" }` in production; includes `message` and `stack` in development
 
 ---
 
-## Controllers Analysis
+## Type System
 
-### Dashboard Controller (`src/controllers/dashboard.controller.ts`)
+### UserRole Enum
 
-#### Endpoints:
-1. **getStats()** - Dashboard overview metrics
-   - Total active employees
-   - Active loans (count + total amount)
-   - Pending advances (current month)
-   - Monthly salary total with trend calculation
-   - Compares current vs previous month for trend percentage
-
-2. **getSalaryTrends()** - N-month salary history
-   - Parameter: `months` (default: 6)
-   - Returns: Month, total salary, employee count per month
-   - Used for salary trend charts
-
-3. **getDepartmentDistribution()** - Employee distribution
-   - Shows count per department
-   - Calculates percentage distribution
-   - Ordered by employee count descending
-
-4. **getAttendanceStats()** - Monthly attendance breakdown
-   - Parameter: `months` (default: 6)
-   - Returns: Present, Absent, HalfDay/Late counts per month
-   - Tracks attendance patterns
-
-5. **getLoanBreakdown()** - Loan status distribution
-   - Groups loans by status (ACTIVE, PAID, CLOSED, etc.)
-   - Shows count and total amount per status
-
-6. **getRecentActivity()** - Activity feed
-   - Parameter: `limit` (default: 10)
-   - Returns recent actions/transactions (incomplete in provided file)
-
-### Roles Controller (`src/controllers/roles.controller.ts`)
-
-#### Key Data Model:
 ```typescript
-{
-  id: string;
-  name: string;
-  level: string | null;
-  departmentId: string;
-  dailyWage: number | null;  // ⚠️ New: For daily wage calculation
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  department: {
-    id: string;
-    name: string;
-    description: string | null;
-  };
+enum UserRole {
+  ADMIN = 'ADMIN',
+  MANAGER = 'MANAGER',
 }
 ```
 
-#### Endpoints (Inferred):
-1. **getRoles()** - List all roles (with optional department filter)
-   - Joins with departments table
-   - Transforms snake_case DB columns to camelCase
+The two roles define the system's access control model. ADMIN users have full access including user registration, employee editing/deletion, and audit log access. MANAGER users have data-entry access — they can create records, view data, but cannot approve, release, edit/delete employees, or view audit logs.
 
-2. **getRolesByDepartment(departmentId)** - Roles for specific department
-   - Only returns active roles
-   - Ordered by name
+This enum aligns with the database schema, which defines the `users.role` column as `ENUM('ADMIN', 'MANAGER')`.
 
-3. **getRole(id)** - Single role details
-   - Includes department information
-   - Returns 404 if not found
+### AuthUser and AuthRequest
+
+`AuthUser` represents the authenticated user attached to requests by the auth middleware (id, username, full_name, role). `AuthRequest` extends the Express `Request` type with an optional `user` property.
 
 ---
 
-## Route Analysis
+## Middleware
 
-### Auth Routes (`src/routes/auth.routes.ts`)
-```
-POST   /api/auth/register        - Register new user
-POST   /api/auth/login           - Login (returns token)
-GET    /api/auth/me              - Get current user (protected)
-POST   /api/auth/logout          - Logout (protected)
-```
+### Authentication (`auth.middleware.ts`)
 
-**Middleware**:
-- Uses `authenticate` middleware for protected routes
-- Auth controller imported from `auth.controller.sql` (naming suggests SQL-based queries)
+The `authenticate` middleware extracts the JWT token from the `Authorization: Bearer <token>` header, verifies it using the `JWT_SECRET` environment variable, and attaches the decoded user (id, username, full_name, role) to `req.user`. Returns 401 for missing or invalid tokens.
 
-### Departments Routes (`src/routes/departments.routes.ts`)
-```
-GET    /api/departments          - List all departments
-GET    /api/departments/:id      - Get specific department
-POST   /api/departments          - Create department (admin only)
-PUT    /api/departments/:id      - Update department (admin only)
-```
+### Role-Based Access Control (`rbac.middleware.ts`)
 
-**Middleware Chain**:
-- `authenticate` - Requires valid token
-- `authorize(UserRole.ADMIN)` - Requires admin role
-- `auditLog('departments', AuditAction.CREATE/UPDATE)` - Logs actions
+The `authorize(...roles)` middleware factory accepts one or more `UserRole` values. It checks that `req.user.role` is included in the allowed roles list. Returns 401 if no user is present, or 403 if the user's role is not authorized.
 
-### Other Routes (Referenced but Not Detailed)
-- `advanceSalaries.routes.ts` - Advance salary CRUD
-- `auditLogs.routes.ts` - Query audit logs
-- `employees.routes.ts` - Employee management
-- `attendance.routes.ts` - Attendance recording
-- `loans.routes.ts` - Loan management
-- `roles.routes.ts` - Role CRUD
-- `salary.routes.ts` - Salary calculation
-- `salaryHistory.routes.ts` - Salary history
-- `holidays.routes.ts` - Holiday management
-- `dashboard.routes.ts` - Dashboard data
-- `dailySalaryReleases.routes.ts` - Daily payroll releases
+### Input Validation (`validate.middleware.ts`)
+
+Two middleware factories are provided:
+
+- **`validate(schema)`** — Validates `req.body` against a Zod schema. On success, replaces `req.body` with the parsed and typed data. On failure, returns `400 { error: "Validation failed", details: [{ field, message, code }] }`.
+- **`validateQuery(schema)`** — Same behavior for `req.query` parameters with the error message "Query validation failed".
+
+### Audit Logging (`auditLog.middleware.ts`)
+
+The `auditLog(tableName, action)` middleware factory:
+
+1. For UPDATE actions, fetches the previous state of the record before the handler executes
+2. Hooks into the response `finish` event to write the log entry asynchronously
+3. Only logs for successful responses (2xx/3xx status codes)
+4. Captures: table name, action type, actor ID, actor role (ADMIN/MANAGER), record ID, before/after data snapshots, IP address, user agent, and a human-readable description
 
 ---
 
-## Database Schema References
+## Validation Schemas
 
-### Core Tables (From Migration Scripts)
+All input validation uses Zod schemas defined in `src/validation/schemas.ts`. The following schemas are implemented:
 
-#### 1. **employees**
-- `id` (PK)
-- `salary_type` ENUM('FIXED', 'DAILY_WAGE')
-- `base_salary` DECIMAL
-- Address fields: `address_line1`, `address_line2`, `city`, `region`
-- Standard employee data (name, email, phone, etc.)
-- `is_active` BOOLEAN
-- `department_id` (FK)
-
-#### 2. **salary_calculations**
-- `id` (PK)
-- `employee_id` (FK)
-- `month` DATE
-- `total_salary` DECIMAL
-- Used for salary history and trend calculations
-- Supports both FIXED and DAILY_WAGE calculations
-
-#### 3. **employee_salary_history**
-- `id` (PK)
-- `employee_id` (FK)
-- `effective_from` DATE
-- `salary_type` ENUM('FIXED', 'DAILY_WAGE')
-- `base_salary` DECIMAL
-- `reason`, `notes`, `changed_by`, `changed_at`
-- Tracks salary changes over time
-
-#### 4. **roles**
-- `id` (PK)
-- `name` VARCHAR
-- `level` VARCHAR (null)
-- `department_id` (FK)
-- `daily_wage` DECIMAL
-- `is_active` BOOLEAN
-- **NEW**: Daily wage rate per role
-
-#### 5. **holidays**
-- `id` (PK)
-- `date` DATE UNIQUE
-- `name` VARCHAR
-- `type` ENUM('PAID', 'UNPAID')
-- `scope` VARCHAR ('GLOBAL', etc.)
-
-#### 6. **loans**
-- `id` (PK)
-- `employee_id` (FK)
-- `loan_amount` DECIMAL
-- `status` (ACTIVE, PAID, etc.)
-- Indexed by status for breakdowns
-
-#### 7. **attendance**
-- `date` DATE
-- `employee_id` (FK)
-- `status` ENUM('PRESENT', 'ABSENT', 'HALF_DAY')
-- Used for attendance stats and salary calculations
-
-#### 8. **departments**
-- `id` (PK)
-- `name` VARCHAR
-- `description` TEXT
-- `created_at`, `updated_at` TIMESTAMPS
-
-#### 9. **audit_logs** (Implicit)
-- Used throughout for logging all CREATE/UPDATE operations
-
-#### 10. **users**
-- `id` (PK)
-- Contains user records for authentication/authorization
+| Schema | Used By | Key Validations |
+|--------|---------|-----------------|
+| `registerSchema` | Auth register | username min 3 chars, password min 8 chars, fullName required, role defaults to MANAGER |
+| `loginSchema` | Auth login | username and password required |
+| `createEmployeeSchema` | Employee create | employeeId, fullName, departmentId, hireDate required; salaryType defaults to DAILY_WAGE |
+| `updateEmployeeSchema` | Employee update | All fields optional |
+| `createDepartmentSchema` | Department create | name required (max 100 chars) |
+| `updateDepartmentSchema` | Department update | All fields optional |
+| `createRoleSchema` | Role create | name and departmentId required |
+| `updateRoleSchema` | Role update | All fields optional |
+| `createAttendanceSchema` | Attendance create | employeeId, date (YYYY-MM-DD), status (PRESENT or ABSENT) |
+| `updateAttendanceSchema` | Attendance update | status and notes optional |
+| `createLoanSchema` | Loan create | employeeId and loanAmount required; repaymentMode defaults to MONTHLY |
+| `updateLoanSchema` | Loan update | status, balance, and repayment fields optional |
+| `settleLoanSchema` | Loan settle | Optional notes |
+| `extendLoanSchema` | Loan extend | numInstallments 1-60 required |
+| `updateInstallmentSchema` | Installment update | amount and status optional |
+| `createAdvanceSalarySchema` | Advance create | employeeId, amount, advanceDate required |
+| `updateAdvanceSalaryStatusSchema` | Advance status | status must be PENDING, APPROVED, or REJECTED |
+| `calculateSalarySchema` | Salary calc | employeeId and month required; bonus defaults to 0 |
+| `createHolidaySchema` | Holiday create | date, name, type (PAID/UNPAID) required; scope defaults to GLOBAL |
+| `updateHolidaySchema` | Holiday update | All fields optional |
+| `updateHolidayEmployeesSchema` | Holiday employees | employeeIds array, min 1 |
+| `generateDailyReleasesSchema` | Daily release gen | date required (YYYY-MM-DD) |
+| `releaseAllDailySalariesSchema` | Bulk release | date required (YYYY-MM-DD) |
+| `createSalaryHistorySchema` | Salary history | effectiveFrom, salaryType, baseSalary, reason required |
+| `verifyPasskeySchema` | Audit logs | passkey required |
+| `paginationQuerySchema` | Shared | page defaults to "1", limit defaults to "50" |
 
 ---
 
-## Missing Utility Files (Critical)
+## API Routes
 
-### `utils/db.ts` - Database Query Wrapper
-**Used by**: All controllers via `query()`, `queryOne()`, `execute()`, `generateId()`
-**Functions called**:
-```typescript
-query<T>(sql: string, params?: any[]): Promise<T[]>
-queryOne<T>(sql: string, params?: any[]): Promise<T | null>
-execute(sql: string, params?: any[]): Promise<any>
-generateId(): string  // Creates UUID
-```
+All routes are registered under the `/api/` prefix. The auth routes have a stricter rate limiter (20 requests per 15 minutes).
 
-### `middleware/auth.middleware.ts`
-**Used by**: All protected routes
-**Function**: `authenticate` - Validates Bearer token, attaches user to request
-**Type**: `AuthRequest` extends Express Request with user property
+### Authentication (`/api/auth`)
 
-### `middleware/rbac.middleware.ts`
-**Used by**: Authorization checks
-**Function**: `authorize(role: UserRole)` - Checks if user has required role
-**Roles**: `UserRole.ADMIN`, presumably `UserRole.EMPLOYEE`
+| Method | Path | Middleware | Description |
+|--------|------|-----------|-------------|
+| POST | `/register` | authenticate, authorize(ADMIN), validate(registerSchema) | Register new user (admin only) |
+| POST | `/login` | validate(loginSchema) | Login and receive JWT token |
+| GET | `/me` | authenticate | Get current authenticated user |
+| POST | `/logout` | authenticate | Logout current user |
 
-### `middleware/auditLog.middleware.ts`
-**Used by**: Create/Update endpoints
-**Function**: `auditLog(tableName, action)` - Logs all data modifications
-**Actions**: `AuditAction.CREATE`, `AuditAction.UPDATE`
+### Employees (`/api/employees`)
 
-### `utils/auditLog.ts`
-**Used by**: auditLog middleware
-**Export**: `AuditAction` enum and logging functions
+| Method | Path | Middleware | Description |
+|--------|------|-----------|-------------|
+| GET | `/` | authenticate | List all employees |
+| GET | `/:id` | authenticate | Get employee by ID |
+| GET | `/:id/profile` | authenticate | Get employee profile with aggregated data |
+| POST | `/` | authenticate, authorize(ADMIN, MANAGER), validate, auditLog | Create employee |
+| PUT | `/:id` | authenticate, authorize(ADMIN), validate, auditLog | Update employee (admin only) |
+| DELETE | `/:id` | authenticate, authorize(ADMIN), auditLog | Delete employee (admin only) |
 
-### `types/index.ts`
-**Used by**: All controllers
-**Exports**:
-- `AuthRequest` - Express request with authenticated user
-- `UserRole` - Enum for ADMIN, EMPLOYEE roles
+### Other Route Modules
 
----
+All 13 route modules follow a similar pattern with `authenticate`, `authorize`, `validate`, and `auditLog` middleware applied as appropriate:
 
-## Database Migrations
-
-### `RUN_IN_MYSQL_WORKBENCH.sql`
-**Purpose**: Initial schema setup
-**Changes**:
-1. Add address columns to employees
-2. Create `employee_salary_history` table
-3. Create `holidays` table
-4. **Status**: ⚠️ Manual - Must be run in MySQL Workbench
-
-### `UPDATE_TO_DAILY_WAGE.sql`
-**Purpose**: Convert employees to daily wage system
-**Changes**:
-1. Update `salary_type` from FIXED to DAILY_WAGE
-2. Clear `base_salary` for daily wage employees
-3. **Status**: ⚠️ Migration pending - Not yet applied
-
-### `add_role_levels.sql`
-**Purpose**: Setup role levels in roles table
-**Status**: ⚠️ Location: `/src/database/add_role_levels.sql`
+- `/api/departments` — Department CRUD
+- `/api/roles` — Role CRUD with department filter
+- `/api/attendance` — Attendance CRUD, daily view, employee calendar
+- `/api/loans` — Loan CRUD, installments, settle, extend
+- `/api/advance-salaries` — Advance salary CRUD with approval workflow
+- `/api/salary` — Salary calculation
+- `/api/salary-history` — Employee salary change history
+- `/api/holidays` — Holiday CRUD with GLOBAL/PER_EMPLOYEE scoping
+- `/api/audit-logs` — Audit log retrieval with passkey verification
+- `/api/dashboard` — Dashboard analytics (stats, trends, distributions)
+- `/api/daily-releases` — Daily salary release generation and management
 
 ---
 
-## Security Issues
+## Database
 
-### 🔴 Critical Security Concerns:
-1. **No input validation** - Controllers don't show validation of input parameters
-2. **SQL Injection Risk** - While using parameterized queries, no validation shown
-3. **Authentication** - Generic error handling doesn't prevent user enumeration
-4. **CORS in Development** - Allows all origins in dev (intentional but risky)
-5. **Token storage** - Bearer tokens sent in Authorization header (good, but no HTTPS enforcement visible)
-6. **Error messages** - Generic 500 errors don't leak information (good practice)
+### Connection Pool
 
-### 🟡 Medium Security Concerns:
-1. **Audit logging** - Middleware exists but not fully shown
-2. **Rate limiting** - Not visible in app.ts
-3. **Request size limits** - Not explicitly configured
-4. **Password hashing** - Not visible in auth controller
+The database utility (`src/utils/db.ts`) creates a MySQL connection pool using `mysql2/promise` with the following configuration sourced from environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_HOST` | `localhost` | MySQL server host |
+| `DATABASE_PORT` | `3306` | MySQL server port |
+| `DATABASE_USER` | `root` | Database user |
+| `DATABASE_PASSWORD` | (empty) | Database password |
+| `DATABASE_NAME` | `ism_salary` | Database name |
+
+The pool is configured with 10 maximum connections and wait-for-connections enabled.
+
+Three query helpers are exported:
+
+- `query<T>(sql, params)` — Returns multiple rows
+- `queryOne<T>(sql, params)` — Returns first row or null
+- `execute(sql, params)` — Returns `ResultSetHeader` for write operations
+
+UUID generation uses `uuid` v4 via the `generateId()` export.
+
+### Schema (14 Tables)
+
+The database schema (`src/database/setup/01_create_schema.sql`) defines the following tables with proper foreign key constraints, unique indexes, and composite indexes:
+
+| Table | Key Columns | Notes |
+|-------|------------|-------|
+| `departments` | id, name (unique), description | Base reference table |
+| `users` | id, username (unique), password_hash, role `ENUM('ADMIN', 'MANAGER')` | Auth users |
+| `roles` | id, department_id (FK), name, level, daily_wage | Unique on (department_id, name, level) |
+| `employees` | id, employee_id (unique), department_id (FK), role_id (FK), salary_type `ENUM('FIXED', 'DAILY_WAGE')` | Core entity |
+| `attendance` | id, employee_id (FK), date, status `ENUM('PRESENT', 'ABSENT')` | Unique on (employee_id, date) |
+| `loans` | id, employee_id (FK), loan_amount, remaining_balance, status, repayment_mode `ENUM('MONTHLY', 'DAILY')` | With daily_repayment_amount |
+| `loan_installments` | id, loan_id (FK), installment_number, due_month, amount, status | Unique on (loan_id, installment_number) |
+| `advance_salaries` | id, employee_id (FK), amount, advance_date, status `ENUM('PENDING', 'APPROVED', 'REJECTED')` | With slip_photo_url |
+| `salary_calculations` | id, employee_id (FK), month, base_salary, daily_wage_total, bonus, deductions, total_salary, status | DRAFT/FINALIZED/PAID |
+| `employee_salary_history` | id, employee_id (FK), effective_from, salary_type, base_salary, reason, changed_by (FK) | Salary change tracking |
+| `holidays` | id, date (unique), name, type `ENUM('PAID', 'UNPAID')`, scope | GLOBAL or PER_EMPLOYEE |
+| `holiday_employees` | id, holiday_id (FK), employee_id (FK) | Junction table for PER_EMPLOYEE holidays |
+| `daily_salary_releases` | id, employee_id (FK), release_date, daily_wage, deductions, net_amount, status | PENDING/RELEASED |
+| `audit_logs` | id, table_name, action, record_id, changed_by (FK), previous_data (JSON), new_data (JSON), description | Comprehensive audit trail |
+
+### Audit Trail
+
+The audit logging system captures all data mutations through the `auditLog.middleware.ts` and `utils/auditLog.ts`:
+
+- **Nine action types**: CREATE, UPDATE, DELETE, LOGIN, LOGOUT, ACCESS, APPROVE, REJECT, RELEASE
+- **Role attribution**: Each audit entry includes the actor's role (`[ADMIN]` or `[MANAGER]` prefix in description)
+- **Data snapshots**: JSON-serialized before/after data for UPDATE operations
+- **Request metadata**: IP address and user agent for forensic analysis
 
 ---
 
-## API Response Patterns
+## Environment Configuration
 
-### Success Responses:
-```json
-{
-  "data": []
-}
-```
-or
-```json
-{
-  "data": { "field": "value" }
-}
-```
+The server requires the following environment variables (see `.env.example`):
 
-### Error Responses:
-```json
-{
-  "error": "Internal server error"
-}
-```
+```env
+# Database
+DATABASE_HOST=localhost
+DATABASE_PORT=3306
+DATABASE_USER=root
+DATABASE_PASSWORD=
+DATABASE_NAME=ism_salary
 
-**Issues**:
-- No standardized response envelope with status codes
-- No error codes for client-side error handling
-- No pagination metadata where applicable
+# Server
+PORT=5001
+NODE_ENV=development
+
+# JWT
+JWT_SECRET=your_jwt_secret_key
+
+# CORS
+CLIENT_URL=http://localhost:3000
+```
 
 ---
 
@@ -405,98 +328,17 @@ or
 
 | Technology | Purpose | Version |
 |-----------|---------|---------|
-| Node.js | Runtime | >=16.0.0 |
-| Express | Web framework | >=4.18.0 |
-| TypeScript | Language | >=5.0.0 |
-| MySQL/MariaDB | Database | >=5.7 |
-| dotenv | Environment config | >=16.0.0 |
-| cors | CORS middleware | >=2.8.5 |
-| cookie-parser | Cookie parsing | >=1.4.6 |
-
-**Expected but not installed**:
-- `mysql2/promise` - MySQL driver
-- `jsonwebtoken` - JWT for auth
-- `bcrypt` - Password hashing
-- `axios` - For internal API calls (if needed)
-- `uuid` - ID generation
-- Test frameworks
-
----
-
-## Critical Issues Summary
-
-### 🔴 Blocking Production:
-1. No `package.json` - Cannot install or run anything
-2. No `tsconfig.json` - TypeScript not configured
-3. Missing all utility files and middleware
-4. Missing auth controller implementation
-5. Database migrations not applied
-
-### 🟡 High Priority:
-1. Environment variables not configured
-2. Database connection not shown
-3. No error handling strategy
-4. No input validation
-5. No rate limiting
-
-### 🟠 Medium Priority:
-1. API response standardization needed
-2. Comprehensive logging setup needed
-3. Performance optimization for dashboard queries
-4. Test suite missing
-5. API documentation (Swagger/OpenAPI) missing
-
----
-
-## Required Steps Before Production
-
-### Phase 1: Setup (Days 1-2)
-- [ ] Create `package.json` with all dependencies
-- [ ] Create `tsconfig.json` configuration
-- [ ] Create `.env.example` with all required variables
-- [ ] Set up database connection utility
-- [ ] Implement authentication middleware and JWT handling
-
-### Phase 2: Core Implementation (Days 3-5)
-- [ ] Implement all missing controller files
-- [ ] Implement RBAC middleware
-- [ ] Implement audit logging middleware
-- [ ] Add input validation across all endpoints
-- [ ] Implement error handling with proper status codes
-
-### Phase 3: Security & Testing (Days 6-8)
-- [ ] Add rate limiting
-- [ ] Add request size limits
-- [ ] Add helmet security headers
-- [ ] Implement comprehensive logging
-- [ ] Write unit tests for key functions
-
-### Phase 4: Database & Deployment (Days 9-10)
-- [ ] Apply database migrations
-- [ ] Test all database queries
-- [ ] Set up database backups
-- [ ] Configure production environment
-- [ ] Deploy to production with monitoring
-
----
-
-## Database Conversion Notes
-
-### Fixed Salary → Daily Wage Migration
-The system is being converted to a **daily wage calculation model** where:
-- Employees are tracked by `daily_wage` in their assigned `role`
-- Salary = (Daily Wage × Days Worked) + Bonuses - Deductions
-- Attendance table tracks daily work status
-- Holidays exempt employees from daily calculations
-- Advances and loans are deducted from calculated salary
-
-This affects:
-- Salary calculation logic (needs to sum by attendance)
-- Reporting (trends now by attendance, not fixed salary)
-- Employee profiles (show daily rate, not monthly salary)
-
----
-
-**Last Updated**: April 12, 2026  
-**Status**: 🔴 CRITICAL - Cannot run or build  
-**Priority**: URGENT - Complete missing files immediately
+| Node.js | Runtime | >= 18 |
+| Express | Web framework | 4.21.2 |
+| TypeScript | Language | 5.7.2 |
+| MySQL | Database (via mysql2/promise) | 3.11.3 |
+| Zod | Input validation | 3.23.8 |
+| jsonwebtoken | JWT authentication | 9.0.2 |
+| bcrypt | Password hashing | 5.1.1 |
+| Helmet | Security headers | 7.1.0 |
+| express-rate-limit | Rate limiting | 7.4.1 |
+| Morgan | Request logging | 1.10.0 |
+| uuid | UUID v4 generation | 10.0.0 |
+| cookie-parser | Cookie handling | 1.4.7 |
+| Multer | File upload (dependency installed) | 1.4.5-lts.2 |
+| dotenv | Environment variable loading | 16.4.5 |

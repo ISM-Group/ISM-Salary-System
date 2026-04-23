@@ -25,7 +25,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 INSERT INTO users (id, username, password_hash, full_name, role, is_active) VALUES
 ('user-admin-001', 'admin', '$2b$10$CwTycUXWue0Thq9StjUM0uJ8rQ5M8r.EzY4xXHzkwmo7aX6ixkmK.', 'Nimal Perera', 'ADMIN', TRUE),
 ('user-hr-001', 'hrmanager', '$2b$10$CwTycUXWue0Thq9StjUM0uJ8rQ5M8r.EzY4xXHzkwmo7aX6ixkmK.', 'Sanduni Jayasinghe', 'ADMIN', TRUE),
-('user-emp-001', 'employee1', '$2b$10$CwTycUXWue0Thq9StjUM0uJ8rQ5M8r.EzY4xXHzkwmo7aX6ixkmK.', 'Kasun Fernando', 'EMPLOYEE', TRUE);
+('user-mgr-001', 'manager1', '$2b$10$CwTycUXWue0Thq9StjUM0uJ8rQ5M8r.EzY4xXHzkwmo7aX6ixkmK.', 'Kasun Fernando', 'MANAGER', TRUE);
 
 INSERT INTO departments (id, name, description) VALUES
 ('dept-hr-001', 'Human Resources', 'Staff administration and policy management'),
@@ -58,14 +58,14 @@ INSERT INTO employees (
 INSERT INTO attendance (id, employee_id, date, status, notes) VALUES
 ('att-001', 'emp-001', CURDATE() - INTERVAL 5 DAY, 'PRESENT', NULL),
 ('att-002', 'emp-001', CURDATE() - INTERVAL 4 DAY, 'PRESENT', NULL),
-('att-003', 'emp-001', CURDATE() - INTERVAL 3 DAY, 'HALF_DAY', 'Medical appointment'),
+('att-003', 'emp-001', CURDATE() - INTERVAL 3 DAY, 'PRESENT', 'Medical appointment'),
 ('att-004', 'emp-002', CURDATE() - INTERVAL 5 DAY, 'PRESENT', NULL),
 ('att-005', 'emp-002', CURDATE() - INTERVAL 4 DAY, 'PRESENT', NULL),
 ('att-006', 'emp-002', CURDATE() - INTERVAL 3 DAY, 'ABSENT', 'Family function'),
 ('att-007', 'emp-003', CURDATE() - INTERVAL 5 DAY, 'PRESENT', NULL),
 ('att-008', 'emp-003', CURDATE() - INTERVAL 4 DAY, 'PRESENT', NULL),
 ('att-009', 'emp-004', CURDATE() - INTERVAL 5 DAY, 'PRESENT', NULL),
-('att-010', 'emp-004', CURDATE() - INTERVAL 4 DAY, 'HALF_DAY', 'Field travel'),
+('att-010', 'emp-004', CURDATE() - INTERVAL 4 DAY, 'PRESENT', 'Field travel'),
 ('att-011', 'emp-005', CURDATE() - INTERVAL 5 DAY, 'PRESENT', NULL),
 ('att-012', 'emp-006', CURDATE() - INTERVAL 5 DAY, 'PRESENT', NULL),
 ('att-013', 'emp-007', CURDATE() - INTERVAL 5 DAY, 'PRESENT', NULL),

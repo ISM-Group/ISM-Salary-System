@@ -14,28 +14,31 @@ import {
   Briefcase,
   CreditCard,
   Wallet,
+  Banknote,
   Calculator,
   History,
   FileText,
   LogOut,
+  CalendarDays,
 } from 'lucide-react';
 
-const adminNavItems = [
-  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-  { label: 'Employees', href: '/admin/employees', icon: Users },
-  { label: 'Attendance', href: '/admin/attendance/entry', icon: Calendar },
-  { label: 'Departments', href: '/admin/departments', icon: Building2 },
-  { label: 'Roles', href: '/admin/roles', icon: Briefcase },
-  { label: 'Loans', href: '/admin/loans', icon: CreditCard },
-  { label: 'Advance Salaries', href: '/admin/advance-salaries', icon: Wallet },
-  { label: 'Salary Calculation', href: '/admin/salary/calculate', icon: Calculator },
-  { label: 'Salary History', href: '/admin/salary/history', icon: History },
-  { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileText },
-];
-
-const employeeNavItems = [
-  { label: 'Dashboard', href: '/employee/dashboard', icon: LayoutDashboard },
-  { label: 'Attendance', href: '/employee/attendance/entry', icon: Calendar },
+/**
+ * Navigation items for the mobile menu header.
+ * Mirrors the Sidebar navItems structure with adminOnly flag.
+ */
+const navItems = [
+  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, adminOnly: false },
+  { label: 'Employees', href: '/admin/employees', icon: Users, adminOnly: false },
+  { label: 'Attendance', href: '/admin/attendance/entry', icon: Calendar, adminOnly: false },
+  { label: 'Departments', href: '/admin/departments', icon: Building2, adminOnly: false },
+  { label: 'Roles', href: '/admin/roles', icon: Briefcase, adminOnly: false },
+  { label: 'Loans', href: '/admin/loans', icon: CreditCard, adminOnly: false },
+  { label: 'Advance Salaries', href: '/admin/advance-salaries', icon: Wallet, adminOnly: false },
+  { label: 'Daily Releases', href: '/admin/daily-releases', icon: Banknote, adminOnly: false },
+  { label: 'Holidays', href: '/admin/holidays', icon: CalendarDays, adminOnly: false },
+  { label: 'Salary Calculation', href: '/admin/salary/calculate', icon: Calculator, adminOnly: false },
+  { label: 'Salary History', href: '/admin/salary/history', icon: History, adminOnly: false },
+  { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileText, adminOnly: true },
 ];
 
 interface HeaderProps {
@@ -43,12 +46,21 @@ interface HeaderProps {
   description?: string;
 }
 
+// PUBLIC_INTERFACE
+/**
+ * Header component with page title and a mobile navigation menu.
+ * Both ADMIN and MANAGER users see the same navigation, with Audit Logs
+ * hidden from MANAGER users. Includes search, notifications, and user avatar.
+ */
 export function Header({ title, description }: HeaderProps) {
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
   const location = useLocation();
-  const navItems = user?.role === 'ADMIN' ? adminNavItems : employeeNavItems;
+  const isAdmin = user?.role === 'ADMIN';
+
+  // Filter nav items based on role — hide adminOnly items from MANAGER
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <>
@@ -116,9 +128,9 @@ export function Header({ title, description }: HeaderProps) {
               </div>
 
               <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-                {navItems.map((item) => {
+                {visibleNavItems.map((item) => {
                   const isActive = location.pathname === item.href || 
-                    (item.href !== '/admin/dashboard' && item.href !== '/employee/dashboard' && location.pathname.startsWith(item.href));
+                    (item.href !== '/admin/dashboard' && location.pathname.startsWith(item.href));
                   
                   return (
                     <NavLink
@@ -142,7 +154,7 @@ export function Header({ title, description }: HeaderProps) {
               <div className="border-t border-sidebar-border p-3">
                 <div className="mb-3 px-3">
                   <p className="text-sm font-medium text-sidebar-foreground">{user?.full_name}</p>
-                  <p className="text-xs text-sidebar-muted capitalize">{user?.role}</p>
+                  <p className="text-xs text-sidebar-muted capitalize">{user?.role?.toLowerCase()}</p>
                 </div>
                 <Button
                   variant="ghost"

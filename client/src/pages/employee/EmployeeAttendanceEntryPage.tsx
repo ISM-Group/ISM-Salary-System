@@ -54,7 +54,6 @@ export function EmployeeAttendanceEntryPage() {
               >
                 <option value="PRESENT">Present</option>
                 <option value="ABSENT">Absent</option>
-                <option value="HALF_DAY">Half Day</option>
               </select>
               <Input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
               <Button type="submit">Submit</Button>

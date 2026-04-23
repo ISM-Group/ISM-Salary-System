@@ -9,6 +9,9 @@ const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const db_1 = require("../utils/db");
 const types_1 = require("../types");
 const auditLog_1 = require("../utils/auditLog");
+/**
+ * Signs a JWT token for the given user payload.
+ */
 const signToken = (user) => {
     const secret = process.env.JWT_SECRET;
     if (!secret) {
@@ -18,6 +21,16 @@ const signToken = (user) => {
         expiresIn: (process.env.JWT_EXPIRES_IN || '8h'),
     });
 };
+// PUBLIC_INTERFACE
+/**
+ * Register a new user.
+ * Only ADMIN users can register new accounts.
+ * Accepts username, password, fullName, and optional role (ADMIN or MANAGER).
+ * Defaults to MANAGER when role is not specified or is invalid.
+ *
+ * @route POST /api/auth/register
+ * @access ADMIN only (enforced via route-level middleware)
+ */
 const register = async (req, res) => {
     const { username, password, fullName, role } = req.body;
     if (!username || !password || !fullName) {
@@ -35,9 +48,20 @@ const register = async (req, res) => {
     }
     const id = (0, db_1.generateId)();
     const hash = await bcrypt_1.default.hash(password, 10);
-    const userRole = role === types_1.UserRole.ADMIN ? types_1.UserRole.ADMIN : types_1.UserRole.EMPLOYEE;
+    // Default to MANAGER; only allow ADMIN when explicitly specified
+    const userRole = role === types_1.UserRole.ADMIN ? types_1.UserRole.ADMIN : types_1.UserRole.MANAGER;
     await (0, db_1.execute)(`INSERT INTO users (id, username, password_hash, full_name, role, is_active, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, TRUE, NOW(), NOW())`, [id, username, hash, fullName, userRole]);
+    // Write audit log for user registration
+    await (0, auditLog_1.writeAuditLog)({
+        tableName: 'users',
+        action: auditLog_1.AuditAction.CREATE,
+        changedBy: req.user?.id,
+        recordId: id,
+        newData: { username, fullName, role: userRole },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'] || '',
+    });
     const token = signToken({ id, username, full_name: fullName, role: userRole });
     res.status(201).json({
         data: {
@@ -47,6 +71,14 @@ const register = async (req, res) => {
     });
 };
 exports.register = register;
+// PUBLIC_INTERFACE
+/**
+ * Login an existing user.
+ * Validates username and password, returns a JWT token on success.
+ *
+ * @route POST /api/auth/login
+ * @access Public
+ */
 const login = async (req, res) => {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -91,6 +123,13 @@ const login = async (req, res) => {
     });
 };
 exports.login = login;
+// PUBLIC_INTERFACE
+/**
+ * Get the currently authenticated user's information.
+ *
+ * @route GET /api/auth/me
+ * @access Authenticated
+ */
 const getCurrentUser = async (req, res) => {
     if (!req.user) {
         res.status(401).json({ error: 'Unauthorized' });
@@ -99,6 +138,13 @@ const getCurrentUser = async (req, res) => {
     res.json({ data: req.user });
 };
 exports.getCurrentUser = getCurrentUser;
+// PUBLIC_INTERFACE
+/**
+ * Logout the current user. Writes an audit log entry.
+ *
+ * @route POST /api/auth/logout
+ * @access Authenticated
+ */
 const logout = async (req, res) => {
     if (req.user) {
         await (0, auditLog_1.writeAuditLog)({

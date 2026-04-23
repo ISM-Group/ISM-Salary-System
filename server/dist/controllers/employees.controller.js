@@ -211,11 +211,10 @@ const getEmployeeProfile = async (req, res) => {
      FROM loans WHERE employee_id = ? ORDER BY created_at DESC`, [req.params.id]);
     const advances = await (0, db_1.query)(`SELECT id, amount, advance_date as advanceDate, slip_photo_url as slipPhotoUrl, notes
      FROM advance_salaries WHERE employee_id = ? ORDER BY advance_date DESC`, [req.params.id]);
+    // Attendance summary: only PRESENT and ABSENT are valid statuses
     const attendance = await (0, db_1.queryOne)(`SELECT
       SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as presentDays,
-      SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as halfDays,
-      SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absentDays,
-      SUM(CASE WHEN status NOT IN ('PRESENT','HALF_DAY','ABSENT') THEN 1 ELSE 0 END) as otherDays
+      SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absentDays
      FROM attendance
      WHERE employee_id = ?
        AND date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)`, [req.params.id]);
@@ -263,9 +262,7 @@ const getEmployeeProfile = async (req, res) => {
             advances: advances.map((a) => ({ ...a, amount: Number(a.amount || 0) })),
             attendanceSummary: {
                 presentDays: Number(attendance?.presentDays || 0),
-                halfDays: Number(attendance?.halfDays || 0),
                 absentDays: Number(attendance?.absentDays || 0),
-                otherDays: Number(attendance?.otherDays || 0),
             },
         },
     });

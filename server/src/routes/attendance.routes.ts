@@ -1,16 +1,24 @@
+/**
+ * Attendance Routes
+ *
+ * Manages employee attendance records.
+ * - GET  /                                  — List attendance records
+ * - GET  /daily                             — Get daily attendance for a date
+ * - GET  /employee/:employeeId/calendar     — Get employee attendance calendar
+ * - POST /                                  — Create/upsert attendance record
+ * - PUT  /:id                               — Update attendance record
+ */
 import { Router } from 'express';
 import {
-  createAttendance,
   getAttendance,
   getDailyAttendance,
-  getEmployeeAttendanceCalendar,
+  createAttendance,
   updateAttendance,
+  getEmployeeAttendanceCalendar,
 } from '../controllers/attendance.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { authorize } from '../middleware/rbac.middleware';
-import { UserRole } from '../types';
-import { auditLog } from '../middleware/auditLog.middleware';
-import { AuditAction } from '../utils/auditLog';
+import { validate } from '../middleware/validate.middleware';
+import { createAttendanceSchema, updateAttendanceSchema } from '../validation/schemas';
 
 const router = Router();
 
@@ -19,7 +27,7 @@ router.use(authenticate);
 router.get('/', getAttendance);
 router.get('/daily', getDailyAttendance);
 router.get('/employee/:employeeId/calendar', getEmployeeAttendanceCalendar);
-router.post('/', authorize(UserRole.ADMIN), auditLog('attendance', AuditAction.CREATE), createAttendance);
-router.put('/:id', authorize(UserRole.ADMIN), auditLog('attendance', AuditAction.UPDATE), updateAttendance);
+router.post('/', validate(createAttendanceSchema), createAttendance);
+router.put('/:id', validate(updateAttendanceSchema), updateAttendance);
 
 export default router;

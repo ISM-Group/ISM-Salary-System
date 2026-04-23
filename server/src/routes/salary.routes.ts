@@ -1,16 +1,21 @@
+/**
+ * Salary Routes
+ *
+ * Handles salary calculations and history retrieval.
+ * - POST /calculate    — Calculate salary for an employee
+ * - GET  /history      — Get salary calculation history
+ */
 import { Router } from 'express';
 import { calculateSalary, getSalaryHistory } from '../controllers/salary.controller';
 import { authenticate } from '../middleware/auth.middleware';
-import { authorize } from '../middleware/rbac.middleware';
-import { UserRole } from '../types';
-import { auditLog } from '../middleware/auditLog.middleware';
-import { AuditAction } from '../utils/auditLog';
+import { validate } from '../middleware/validate.middleware';
+import { calculateSalarySchema } from '../validation/schemas';
 
 const router = Router();
 
 router.use(authenticate);
 
-router.post('/calculate', authorize(UserRole.ADMIN), auditLog('salary_calculations', AuditAction.CREATE), calculateSalary);
+router.post('/calculate', validate(calculateSalarySchema), calculateSalary);
 router.get('/history', getSalaryHistory);
 
 export default router;

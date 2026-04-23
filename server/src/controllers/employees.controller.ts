@@ -1,7 +1,15 @@
 import { Response } from 'express';
 import { execute, generateId, query, queryOne } from '../utils/db';
 import { AuthRequest } from '../types';
+import { parsePagination, buildPaginationMeta } from '../utils/pagination';
 
+/**
+ * GET /employees
+ * Returns the list of employees, optionally filtered by department, active status, or search term.
+ * Supports server-side pagination via ?page=&limit= query parameters.
+ * When no isActive filter is provided, defaults to returning only active employees (is_active = true).
+ */
+// PUBLIC_INTERFACE
 export const getEmployees = async (req: AuthRequest, res: Response): Promise<void> => {
   const { departmentId, isActive, search } = req.query as {
     departmentId?: string;
@@ -9,8 +17,9 @@ export const getEmployees = async (req: AuthRequest, res: Response): Promise<voi
     search?: string;
   };
 
-  let sql = `
-    SELECT
+  const pagination = parsePagination(req.query as Record<string, unknown>);
+
+  const selectFields = `
       e.id,
       e.employee_id as employeeId,
       e.full_name as fullName,
@@ -29,30 +38,46 @@ export const getEmployees = async (req: AuthRequest, res: Response): Promise<voi
       r.id as roleId,
       r.name as roleName,
       r.daily_wage as roleDailyWage
+  `;
+
+  const fromClause = `
     FROM employees e
     LEFT JOIN departments d ON d.id = e.department_id
     LEFT JOIN roles r ON r.id = e.role_id
-    WHERE 1=1
   `;
+
+  let whereClause = ' WHERE 1=1';
   const params: unknown[] = [];
 
   if (departmentId) {
-    sql += ' AND e.department_id = ?';
+    whereClause += ' AND e.department_id = ?';
     params.push(departmentId);
   }
+
+  // Default to active employees when no explicit isActive filter is provided.
   if (isActive === 'true' || isActive === 'false') {
-    sql += ' AND e.is_active = ?';
+    whereClause += ' AND e.is_active = ?';
     params.push(isActive === 'true');
+  } else {
+    // Default: show only active employees
+    whereClause += ' AND e.is_active = ?';
+    params.push(true);
   }
+
   if (search) {
-    sql += ' AND (e.full_name LIKE ? OR e.employee_id LIKE ? OR e.email LIKE ? OR e.phone LIKE ?)';
+    whereClause += ' AND (e.full_name LIKE ? OR e.employee_id LIKE ? OR e.email LIKE ? OR e.phone LIKE ?)';
     const q = `%${search}%`;
     params.push(q, q, q, q);
   }
 
-  sql += ' ORDER BY e.full_name ASC';
+  // Count total for pagination
+  const countResult = await queryOne<{ total: number }>(`SELECT COUNT(*) AS total ${fromClause} ${whereClause}`, params);
+  const total = Number(countResult?.total || 0);
 
-  const rows = await query<any>(sql, params);
+  // Fetch paginated data
+  const dataSql = `SELECT ${selectFields} ${fromClause} ${whereClause} ORDER BY e.full_name ASC LIMIT ? OFFSET ?`;
+  const rows = await query<any>(dataSql, [...params, pagination.limit, pagination.offset]);
+
   res.json({
     data: rows.map((row) => ({
       id: row.id,
@@ -75,9 +100,15 @@ export const getEmployees = async (req: AuthRequest, res: Response): Promise<voi
         ? { id: row.roleId, name: row.roleName, dailyWage: row.roleDailyWage ? Number(row.roleDailyWage) : null }
         : null,
     })),
+    pagination: buildPaginationMeta(total, pagination),
   });
 };
 
+/**
+ * GET /employees/:id
+ * Returns a single employee by ID.
+ */
+// PUBLIC_INTERFACE
 export const getEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
   const result = await queryOne<any>(
     `SELECT
@@ -120,6 +151,12 @@ export const getEmployee = async (req: AuthRequest, res: Response): Promise<void
   });
 };
 
+/**
+ * POST /employees
+ * Creates a new employee record.
+ * Required fields: employeeId, fullName, departmentId, hireDate.
+ */
+// PUBLIC_INTERFACE
 export const createEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
   const {
     employeeId,
@@ -172,6 +209,17 @@ export const createEmployee = async (req: AuthRequest, res: Response): Promise<v
   res.status(201).json({ data: created });
 };
 
+/**
+ * PUT /employees/:id
+ * Updates an employee record.
+ *
+ * FIX: Replaced COALESCE pattern with explicit field assignments.
+ * The old COALESCE approach made it impossible to clear optional fields once set,
+ * because COALESCE(NULL, current_value) always keeps the old value.
+ * Now, only fields that are explicitly present in the request body are updated.
+ * To clear an optional field, send it with an explicit null value in the payload.
+ */
+// PUBLIC_INTERFACE
 export const updateEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
   const existing = await queryOne<{ id: string }>('SELECT id FROM employees WHERE id = ?', [req.params.id]);
   if (!existing) {
@@ -180,46 +228,59 @@ export const updateEmployee = async (req: AuthRequest, res: Response): Promise<v
   }
 
   const payload = req.body as Record<string, unknown>;
+
+  // Map from payload key -> database column name
+  const fieldMap: Record<string, string> = {
+    employeeId: 'employee_id',
+    fullName: 'full_name',
+    email: 'email',
+    phone: 'phone',
+    departmentId: 'department_id',
+    roleId: 'role_id',
+    hireDate: 'hire_date',
+    salaryType: 'salary_type',
+    baseSalary: 'base_salary',
+    isActive: 'is_active',
+    addressLine1: 'address_line1',
+    addressLine2: 'address_line2',
+    city: 'city',
+    region: 'region',
+  };
+
+  const setClauses: string[] = [];
+  const params: unknown[] = [];
+
+  for (const [payloadKey, column] of Object.entries(fieldMap)) {
+    if (payloadKey in payload) {
+      setClauses.push(`${column} = ?`);
+      params.push(payload[payloadKey] ?? null);
+    }
+  }
+
+  // If no updatable fields were provided, return early
+  if (setClauses.length === 0) {
+    res.status(400).json({ error: 'No updatable fields provided' });
+    return;
+  }
+
+  // Always update the timestamp
+  setClauses.push('updated_at = NOW()');
+  params.push(req.params.id);
+
   await execute(
-    `UPDATE employees
-     SET employee_id = COALESCE(?, employee_id),
-         full_name = COALESCE(?, full_name),
-         email = COALESCE(?, email),
-         phone = COALESCE(?, phone),
-         department_id = COALESCE(?, department_id),
-         role_id = COALESCE(?, role_id),
-         hire_date = COALESCE(?, hire_date),
-         salary_type = COALESCE(?, salary_type),
-         base_salary = COALESCE(?, base_salary),
-         is_active = COALESCE(?, is_active),
-         address_line1 = COALESCE(?, address_line1),
-         address_line2 = COALESCE(?, address_line2),
-         city = COALESCE(?, city),
-         region = COALESCE(?, region),
-         updated_at = NOW()
-     WHERE id = ?`,
-    [
-      payload.employeeId ?? null,
-      payload.fullName ?? null,
-      payload.email ?? null,
-      payload.phone ?? null,
-      payload.departmentId ?? null,
-      payload.roleId ?? null,
-      payload.hireDate ?? null,
-      payload.salaryType ?? null,
-      payload.baseSalary ?? null,
-      payload.isActive ?? null,
-      payload.addressLine1 ?? null,
-      payload.addressLine2 ?? null,
-      payload.city ?? null,
-      payload.region ?? null,
-      req.params.id,
-    ]
+    `UPDATE employees SET ${setClauses.join(', ')} WHERE id = ?`,
+    params
   );
 
   res.json({ message: 'Employee updated successfully' });
 };
 
+/**
+ * GET /employees/:id/profile
+ * Returns a comprehensive employee profile including salary history,
+ * loans, advances, and attendance summary.
+ */
+// PUBLIC_INTERFACE
 export const getEmployeeProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   const employee = await queryOne<any>(
     `SELECT
@@ -271,12 +332,11 @@ export const getEmployeeProfile = async (req: AuthRequest, res: Response): Promi
     [req.params.id]
   );
 
+  // Attendance summary: only PRESENT and ABSENT are valid statuses
   const attendance = await queryOne<any>(
     `SELECT
       SUM(CASE WHEN status = 'PRESENT' THEN 1 ELSE 0 END) as presentDays,
-      SUM(CASE WHEN status = 'HALF_DAY' THEN 1 ELSE 0 END) as halfDays,
-      SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absentDays,
-      SUM(CASE WHEN status NOT IN ('PRESENT','HALF_DAY','ABSENT') THEN 1 ELSE 0 END) as otherDays
+      SUM(CASE WHEN status = 'ABSENT' THEN 1 ELSE 0 END) as absentDays
      FROM attendance
      WHERE employee_id = ?
        AND date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)`,
@@ -327,14 +387,17 @@ export const getEmployeeProfile = async (req: AuthRequest, res: Response): Promi
       advances: advances.map((a) => ({ ...a, amount: Number(a.amount || 0) })),
       attendanceSummary: {
         presentDays: Number(attendance?.presentDays || 0),
-        halfDays: Number(attendance?.halfDays || 0),
         absentDays: Number(attendance?.absentDays || 0),
-        otherDays: Number(attendance?.otherDays || 0),
       },
     },
   });
 };
 
+/**
+ * DELETE /employees/:id
+ * Soft-deletes an employee by setting is_active to false.
+ */
+// PUBLIC_INTERFACE
 export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
   const existing = await queryOne<{ id: string }>('SELECT id FROM employees WHERE id = ?', [req.params.id]);
   if (!existing) {
@@ -342,6 +405,6 @@ export const deleteEmployee = async (req: AuthRequest, res: Response): Promise<v
     return;
   }
 
-  await execute('DELETE FROM employees WHERE id = ?', [req.params.id]);
+  await execute('UPDATE employees SET is_active = false, updated_at = NOW() WHERE id = ?', [req.params.id]);
   res.json({ message: 'Employee deleted successfully' });
 };

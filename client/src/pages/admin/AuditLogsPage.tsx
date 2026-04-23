@@ -6,22 +6,35 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Pagination } from '@/components/ui/pagination';
 
+// PUBLIC_INTERFACE
+/**
+ * AuditLogsPage — Displays audit logs with passkey verification,
+ * table name filtering, and server-side pagination.
+ */
 export function AuditLogsPage() {
   const [passkey, setPasskey] = useState('');
   const [verified, setVerified] = useState(false);
   const [tableFilter, setTableFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const limit = 25;
 
-  const { data, refetch } = useQuery({
-    queryKey: ['audit-logs-admin', tableFilter, verified],
+  const { data: responseData, refetch } = useQuery({
+    queryKey: ['audit-logs-admin', tableFilter, verified, page, limit],
     queryFn: async () => {
       if (!verified) {
-        return [];
+        return { data: [], pagination: null };
       }
-      const response = await auditLogsAPI.getAll(tableFilter ? { tableName: tableFilter } : undefined);
-      return response.data;
+      const params: Record<string, unknown> = { page, limit };
+      if (tableFilter) params.tableName = tableFilter;
+      const response = await auditLogsAPI.getAll(params);
+      return response;
     },
   });
+
+  const logs = responseData?.data || [];
+  const pagination = responseData?.pagination;
 
   const verify = async (e: FormEvent) => {
     e.preventDefault();
@@ -60,7 +73,7 @@ export function AuditLogsPage() {
               <Input
                 placeholder="Filter by table name (optional)"
                 value={tableFilter}
-                onChange={(e) => setTableFilter(e.target.value)}
+                onChange={(e) => { setTableFilter(e.target.value); setPage(1); }}
               />
               <Table>
                 <TableHeader>
@@ -72,7 +85,7 @@ export function AuditLogsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(data || []).map((row: any) => (
+                  {logs.map((row: any) => (
                     <TableRow key={row.id}>
                       <TableCell>{row.tableName}</TableCell>
                       <TableCell>{row.action}</TableCell>
@@ -80,8 +93,25 @@ export function AuditLogsPage() {
                       <TableCell>{new Date(row.changedAt).toLocaleString()}</TableCell>
                     </TableRow>
                   ))}
+                  {logs.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        No audit logs found
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
+
+              {pagination && (
+                <Pagination
+                  page={pagination.page}
+                  totalPages={pagination.totalPages}
+                  total={pagination.total}
+                  limit={pagination.limit}
+                  onPageChange={setPage}
+                />
+              )}
             </CardContent>
           </Card>
         )}

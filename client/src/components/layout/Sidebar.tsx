@@ -10,34 +10,49 @@ import {
   Briefcase,
   CreditCard,
   Wallet,
+  Banknote,
   Calculator,
   History,
   FileText,
   LogOut,
+  CalendarDays,
+  BarChart3,
 } from 'lucide-react';
 
-const adminNavItems = [
-  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
-  { label: 'Employees', href: '/admin/employees', icon: Users },
-  { label: 'Attendance', href: '/admin/attendance/entry', icon: Calendar },
-  { label: 'Departments', href: '/admin/departments', icon: Building2 },
-  { label: 'Roles', href: '/admin/roles', icon: Briefcase },
-  { label: 'Loans', href: '/admin/loans', icon: CreditCard },
-  { label: 'Advance Salaries', href: '/admin/advance-salaries', icon: Wallet },
-  { label: 'Salary Calculation', href: '/admin/salary/calculate', icon: Calculator },
-  { label: 'Salary History', href: '/admin/salary/history', icon: History },
-  { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileText },
+/**
+ * Navigation items for the admin sidebar.
+ * Both ADMIN and MANAGER roles see these items, with the exception of
+ * Audit Logs which is conditionally hidden for MANAGER users.
+ */
+const navItems = [
+  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard, adminOnly: false },
+  { label: 'Employees', href: '/admin/employees', icon: Users, adminOnly: false },
+  { label: 'Attendance', href: '/admin/attendance/entry', icon: Calendar, adminOnly: false },
+  { label: 'Departments', href: '/admin/departments', icon: Building2, adminOnly: false },
+  { label: 'Roles', href: '/admin/roles', icon: Briefcase, adminOnly: false },
+  { label: 'Loans', href: '/admin/loans', icon: CreditCard, adminOnly: false },
+  { label: 'Advance Salaries', href: '/admin/advance-salaries', icon: Wallet, adminOnly: false },
+  { label: 'Daily Releases', href: '/admin/daily-releases', icon: Banknote, adminOnly: false },
+  { label: 'Holidays', href: '/admin/holidays', icon: CalendarDays, adminOnly: false },
+  { label: 'Salary Calculation', href: '/admin/salary/calculate', icon: Calculator, adminOnly: false },
+  { label: 'Salary History', href: '/admin/salary/history', icon: History, adminOnly: false },
+  { label: 'Reports', href: '/admin/reports', icon: BarChart3, adminOnly: false },
+  { label: 'Audit Logs', href: '/admin/audit-logs', icon: FileText, adminOnly: true },
 ];
 
-const employeeNavItems = [
-  { label: 'Dashboard', href: '/employee/dashboard', icon: LayoutDashboard },
-  { label: 'Attendance', href: '/employee/attendance/entry', icon: Calendar },
-];
-
+// PUBLIC_INTERFACE
+/**
+ * Sidebar component displaying navigation links for the ISM Salary System.
+ * Both ADMIN and MANAGER users see the same navigation, with Audit Logs
+ * hidden from MANAGER users. Renders the ISM branding, user info, and logout.
+ */
 export function Sidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const navItems = user?.role === 'ADMIN' ? adminNavItems : employeeNavItems;
+  const isAdmin = user?.role === 'ADMIN';
+
+  // Filter nav items based on role — hide adminOnly items from MANAGER
+  const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-sidebar-border bg-sidebar-background lg:flex lg:flex-col">
@@ -51,11 +66,10 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive =
             location.pathname === item.href ||
             (item.href !== '/admin/dashboard' &&
-              item.href !== '/employee/dashboard' &&
               location.pathname.startsWith(item.href));
 
           return (
@@ -79,7 +93,7 @@ export function Sidebar() {
       <div className="border-t border-sidebar-border p-3">
         <div className="mb-3 px-3">
           <p className="text-sm font-medium text-sidebar-foreground">{user?.full_name}</p>
-          <p className="text-xs text-sidebar-muted capitalize">{user?.role}</p>
+          <p className="text-xs text-sidebar-muted capitalize">{user?.role?.toLowerCase()}</p>
         </div>
         <Button
           variant="ghost"

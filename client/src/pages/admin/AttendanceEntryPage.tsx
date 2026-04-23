@@ -159,7 +159,6 @@ export function AttendanceEntryPage() {
                   >
                     <option value="PRESENT">Present</option>
                     <option value="ABSENT">Absent</option>
-                    <option value="HALF_DAY">Half Day</option>
                   </select>
                 </>
               ) : (

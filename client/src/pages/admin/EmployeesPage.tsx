@@ -12,14 +12,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Pagination } from '@/components/ui/pagination';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Eye, Pencil, Loader2, Trash2 } from 'lucide-react';
 import { employeesAPI, departmentsAPI } from '@/lib/api';
 
+// PUBLIC_INTERFACE
+/**
+ * EmployeesPage — Manages employee list with server-side pagination,
+ * search, and filtering by department/status.
+ */
 export function EmployeesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const limit = 20;
 
   // Fetch departments for filter
   const { data: departmentsData } = useQuery({
@@ -30,36 +38,34 @@ export function EmployeesPage() {
     },
   });
 
-  // Fetch employees
-  const { data: employeesData, isLoading, refetch } = useQuery({
-    queryKey: ['employees', departmentFilter, statusFilter],
+  // Fetch employees with server-side pagination
+  const { data: employeesResponse, isLoading, refetch } = useQuery({
+    queryKey: ['employees', departmentFilter, statusFilter, searchQuery, page, limit],
     queryFn: async () => {
-      const params: any = {};
+      const params: any = { page, limit };
       if (departmentFilter !== 'all') {
         params.departmentId = departmentFilter;
       }
       if (statusFilter !== 'all') {
         params.isActive = statusFilter === 'active';
       }
+      if (searchQuery) {
+        params.search = searchQuery;
+      }
       const response = await employeesAPI.getAll(params);
-      return response.data;
+      return response;
     },
   });
 
-  const employees = employeesData || [];
+  const employees = employeesResponse?.data || [];
+  const pagination = employeesResponse?.pagination;
   const departments = departmentsData || [];
 
-  // Client-side filtering for search
-  const filteredEmployees = employees.filter((employee: any) => {
-    const matchesSearch =
-      !searchQuery ||
-      employee.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.employeeId?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      employee.phone?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    return matchesSearch;
-  });
+  // Reset page when filters change
+  const handleFilterChange = (setter: (val: string) => void, val: string) => {
+    setter(val);
+    setPage(1);
+  };
 
   return (
     <MainLayout title="Employees" description="Manage your organization's employees">
@@ -72,13 +78,13 @@ export function EmployeesPage() {
               <Input
                 placeholder="Search by name or ID..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => handleFilterChange(setSearchQuery, e.target.value)}
                 className="pl-9"
               />
             </div>
             <select
               value={departmentFilter}
-              onChange={(e) => setDepartmentFilter(e.target.value)}
+              onChange={(e) => handleFilterChange(setDepartmentFilter, e.target.value)}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full sm:w-32"
             >
               <option value="all">All Depts</option>
@@ -90,7 +96,7 @@ export function EmployeesPage() {
             </select>
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={(e) => handleFilterChange(setStatusFilter, e.target.value)}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full sm:w-28"
             >
               <option value="all">All</option>
@@ -128,7 +134,7 @@ export function EmployeesPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredEmployees.map((employee: any) => (
+                employees.map((employee: any) => (
                   <TableRow key={employee.id} className="group">
                     <TableCell className="font-mono text-sm">{employee.employeeId}</TableCell>
                     <TableCell>
@@ -173,7 +179,7 @@ export function EmployeesPage() {
                   </TableRow>
                 ))
               )}
-              {!isLoading && filteredEmployees.length === 0 && (
+              {!isLoading && employees.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                     No employees found
@@ -183,6 +189,17 @@ export function EmployeesPage() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Server-side pagination controls */}
+        {pagination && (
+          <Pagination
+            page={pagination.page}
+            totalPages={pagination.totalPages}
+            total={pagination.total}
+            limit={pagination.limit}
+            onPageChange={setPage}
+          />
+        )}
       </div>
     </MainLayout>
   );

@@ -1,310 +1,193 @@
-# ISM Salary System - Documentation Index
+# ISM Salary System — Documentation Index
 
-**Analysis Date**: April 12, 2026  
-**System Status**: 🟡 Functional MVP implemented (production hardening pending)  
-**Latest Update**: See `IMPLEMENTATION_UPDATE.md`
-
----
-
-## 📋 Document Guide
-
-Start here to understand the system and what needs to be done:
-
-### 1. **IMPLEMENTATION_UPDATE.md** ⭐ START HERE
-   - **For**: Everyone
-   - **Time**: 3-5 minutes
-   - **Contains**:
-     - What was implemented end-to-end
-     - Current runnable status
-     - What remains before production release
-
-### 2. **EXEC_SUMMARY.md**
-   - **For**: Everyone (executives, developers, project managers)
-   - **Time**: 5 minutes
-   - **Contains**: 
-     - TL;DR status
-     - Current state vs needed state
-     - Budget and timeline
-     - 36 issues at a glance
-     - Recommendations
-
-### 3. **PRODUCTION_READINESS.md** 
-   - **For**: Technical decision makers, team leads
-   - **Time**: 15-20 minutes
-   - **Contains**:
-     - System architecture diagram  
-     - 18 critical blocking issues detailed
-     - 18 high/medium priority issues
-     - Risk assessment matrix
-     - Phased action plan (Days 1-10)
-     - Technology stack validation
-
-### 4. **QUICK_FIX_GUIDE.md**
-   - **For**: Developers ready to start fixing
-   - **Time**: 2-3 hours to implement
-   - **Contains**:
-     - 13 complete template files (copy-paste ready)
-     - Installation steps
-     - Configuration values
-     - Immediate next steps
-     - Checklist to follow
-
-### 5. **CLIENT_ARCHITECTURE.md**
-   - **For**: Frontend developers
-   - **Time**: 10-15 minutes
-   - **Contains**:
-     - Client directory structure
-     - Component analysis
-     - Page structure
-     - API integration setup
-     - 9 critical client issues
-     - Missing UI components list
-     - Tech stack breakdown
-
-### 6. **SERVER_ARCHITECTURE.md**
-   - **For**: Backend developers  
-     **Time**: 10-15 minutes
-   - **Contains**:
-     - Server directory structure
-     - Controller analysis
-     - Route structure
-     - Database schema
-     - Missing utility files
-     - 7 critical server issues
-    - Security concerns
-    - Database conversion notes
-
-### 7. **TEST_DATABASE_SETUP.md** ⭐ FOR TESTING
-   - **For**: Developers and QA
-   - **Contains**:
-     - Full schema setup script path
-     - Sri Lanka sample data seed script path
-     - Run commands and test credentials
-
-### 8. **NON_TECH_USER_GUIDE.md** ⭐ FOR BUSINESS USERS
-   - **For**: HR, Finance, Operations, Managers
-   - **Contains**:
-     - Plain-language usage guide
-     - Monthly workflow
-     - Common mistakes and troubleshooting tips
+**Last Updated**: Synchronized with current codebase  
+**System Status**: 🟢 Functional MVP (both client and server build and run)  
+**Architecture**: React + Vite (client) / Express + TypeScript + MySQL (server)
 
 ---
 
-## 🚀 Quick Navigation
+## Overview
 
-**"I'm a developer starting now"**
-→ Read IMPLEMENTATION_UPDATE → Run app locally → Refer to CLIENT/SERVER docs
+The ISM Salary Management System is a full-stack web application for daily-wage and fixed-salary payroll management, built for a Sri Lanka-based organization. It provides a comprehensive administrative dashboard for managing employees, attendance, loans, advance salaries, salary calculations, and daily salary releases, along with a robust audit trail.
 
-**"I need to brief my boss"**  
-→ Read IMPLEMENTATION_UPDATE → Share remaining production checklist
+The system consists of two primary components:
 
-**"I'm doing frontend"**  
-→ Read CLIENT_ARCHITECTURE → Use QUICK_FIX_GUIDE client files
+- **Client** (`client/`): A React 18 single-page application built with Vite, TypeScript, Tailwind CSS, and TanStack Query. Runs on port 3000.
+- **Server** (`server/`): An Express.js REST API built with TypeScript, connecting to MySQL 8+ via `mysql2`. Runs on port 5001.
 
-**"I'm doing backend"**  
-→ Read SERVER_ARCHITECTURE → Use QUICK_FIX_GUIDE server files
-
-**"I'm managing the project"**  
-→ Read PRODUCTION_READINESS (Phases section) → Print EXEC_SUMMARY checklist
+Both components build successfully and can be run locally with the commands below.
 
 ---
 
-## 📊 Issues Breakdown
+## Quick Start
 
-### By Severity
-- 🔴 **Critical**: 11 issues (blocks shipping)
-- 🟡 **High**: 10 issues (major bugs)
-- 🟠 **Medium**: 10 issues (quality)
-- 🔵 **Low**: 5 issues (nice-to-have)
+### Prerequisites
 
-### By Category
-- **Infrastructure**: 7 critical issues
-- **Security**: 4 critical issues  
-- **Code Quality**: 3 critical issues
-- **Operations**: 2 critical issues
-- **Performance**: 1 critical issue
+- Node.js >= 18
+- npm >= 9
+- MySQL 8+ (running, with a database created)
 
-### Most Severe
-1. Missing `package.json` (both) - **Cannot install**
-2. Missing `tsconfig.json` (both) - **Cannot compile**
-3. Missing DB utilities - **Cannot query database**
-4. Missing middleware - **No auth/RBAC/logging**
-5. Missing entry points - **Cannot start servers**
+### Server
 
----
-
-## ⏱️ Timeline Summary
-
-| Phase | Duration | Status |
-|-------|----------|--------|
-| **Phase 1: Foundation** | 2 days | TODO |
-| **Phase 2: Implementation** | 3-5 days | TODO |
-| **Phase 3: Security** | 2 days | TODO |
-| **Phase 4: Testing** | 2-3 days | TODO |
-| **Phase 5: Deployment** | 1-2 days | TODO |
-| **TOTAL** | **10-15 days** | 🔴 BLOCKED|
-
-Realistic: 21-30 days with proper QA
-
----
-
-## ✅ What Exists
-
-- ✅ Express app configuration
-- ✅ Database migration scripts
-- ✅ 2 partially complete controllers
-- ✅ 2 route files (out of 13)
-- ✅ Client API layer
-- ✅ Styling system (Tailwind)
-- ✅ Component structure (empty)
-- ✅ Architecture design
-
-## ⚠️ What's Pending
-
-- ⚠️ Production-grade automated test coverage
-- ⚠️ CI/CD and observability setup
-- ⚠️ Full UAT/performance/security certification
-- ⚠️ Final production deployment workflow
-
----
-
-## 🎯 Immediate Action Items
-
-### In Next 3 Hours (Critical Path)
-```
-1. Create server/package.json
-2. Create server/tsconfig.json  
-3. Create server/.env.local
-4. Create server/src/server.ts
-5. Create client/package.json
-6. Create client/tsconfig.json
-7. Create client/vite.config.ts
-8. Create client/src/main.tsx
-9. Create client/index.html
-10. Create client/.env.local
+```bash
+cd server
+cp .env.example .env        # edit database credentials and JWT secret
+npm install
+npm run dev                  # starts on http://localhost:5001
 ```
 
-**Use templates from QUICK_FIX_GUIDE.md**
+### Client
 
-### Then (Same Day)
-```
-11. npm install (server)
-12. npm install (client)
-13. npm run build (server)
-14. npm run build (client)
+```bash
+cd client
+npm install
+npm run dev                  # starts on http://localhost:3000
 ```
 
-### If Successful
-- ✅ TypeScript compiles
-- ✅ No dependency errors
-- ✅ Ready for Phase 2 implementation
+### Database Setup
+
+```bash
+mysql -u root -p ism_salary < server/src/database/setup/01_create_schema.sql
+mysql -u root -p ism_salary < server/src/database/setup/02_seed_sri_lanka_data.sql
+```
+
+Default test credentials after seeding: **admin / password**
 
 ---
 
-## 📁 File Organization
+## Document Guide
+
+| # | Document | Audience | Description |
+|---|----------|----------|-------------|
+| 1 | **IMPLEMENTATION_UPDATE.md** ⭐ | Everyone | Authoritative status: what was built, how to run, what remains |
+| 2 | **CLIENT_ARCHITECTURE.md** | Frontend developers | Client directory structure, components, pages, API layer, routing |
+| 3 | **SERVER_ARCHITECTURE.md** | Backend developers | Server structure, middleware, controllers, routes, database schema |
+| 4 | **TEST_DATABASE_SETUP.md** | Developers / QA | Schema setup and Sri Lanka seed data instructions |
+| 5 | **NON_TECH_USER_GUIDE.md** | HR / Finance / Ops | Plain-language usage guide with monthly workflow |
+| 6 | **EXEC_SUMMARY.md** | Project managers | High-level status and remaining production checklist |
+| 7 | **PRODUCTION_READINESS.md** | Tech leads | Production hardening checklist and phased action plan |
+| 8 | **QUICK_FIX_GUIDE.md** | Reference only | Historical setup templates (most items now implemented) |
+
+**Recommended reading order**: Start with `IMPLEMENTATION_UPDATE.md`, then refer to `CLIENT_ARCHITECTURE.md` or `SERVER_ARCHITECTURE.md` depending on your role.
+
+---
+
+## What Exists Today
+
+### Server (all implemented ✅)
+
+- Express app with full middleware stack (Helmet, rate limiting, CORS, Morgan logging, body parsing)
+- JWT authentication with bcrypt password hashing
+- Role-based access control (ADMIN and MANAGER roles)
+- Zod-based input validation middleware across all routes
+- Audit logging middleware with role attribution
+- All 13 controllers and 13 route modules
+- MySQL connection pool via `mysql2/promise`
+- Structured error handling (CORS, JSON parse, and generic errors with dev-only stack traces)
+- Health check endpoint (`GET /health`) with database connectivity verification
+- Database schema (14 tables) and Sri Lanka seed data
+- 8 migration scripts
+
+### Client (all implemented ✅)
+
+- React 18 SPA with Vite build tooling and TypeScript
+- TanStack React Query for data fetching
+- React Router v6 with protected routes and role-based gating
+- AuthContext for JWT token and user state management
+- ErrorBoundary component for crash recovery
+- LoadingSpinner and PageError UI components
+- MainLayout with Sidebar (12 navigation items) and Header
+- 15 admin pages and 2 employee self-service pages
+- Comprehensive API client (`lib/api.ts`) with 12 service modules
+- 8 reusable UI components (button, input, textarea, label, card, table, badge, loading-spinner)
+- Tailwind CSS design system with custom color tokens
+
+---
+
+## Remaining Work Before Production
+
+The current codebase is a functional MVP. Before production deployment, complete:
+
+1. **Automated testing** — No test files exist yet; install test framework and write unit/integration tests
+2. **CI/CD pipeline** — No GitHub Actions, Dockerfiles, or deployment configs
+3. **Database migration execution** — Run schema and seed scripts on the target database
+4. **End-to-end validation** — Verify all flows against real schema and business rules
+5. **Security audit** — Review JWT token policy, secrets management, and access control
+6. **Observability** — Set up logging, error tracking, and performance monitoring
+7. **UAT and load testing** — Validate under realistic data volumes
+
+---
+
+## Architecture Overview
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│              ISM Salary Management System                     │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ┌──────────────────┐         ┌──────────────────┐          │
+│  │   React Client   │◄───────►│  Express Server  │          │
+│  │   (Port 3000)    │  HTTP   │   (Port 5001)    │          │
+│  │                  │  REST   │                  │          │
+│  │ • Vite + TS      │  API    │ • JWT Auth       │          │
+│  │ • Tailwind CSS   │         │ • Zod Validation │          │
+│  │ • React Query    │         │ • RBAC (roles)   │          │
+│  │ • ErrorBoundary  │         │ • Audit Logging  │          │
+│  └──────────────────┘         └────────┬─────────┘          │
+│                                        │                     │
+│                            ┌───────────┴──────────┐         │
+│                            │   MySQL 8+ Database  │         │
+│                            │   14 tables, FK      │         │
+│                            │   constraints, UUID   │         │
+│                            │   primary keys        │         │
+│                            └──────────────────────┘         │
+└──────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Technology Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Frontend | React | 18.3.1 |
+| Build Tool | Vite | 5.4.11 |
+| Language | TypeScript | 5.7.2 |
+| Styling | Tailwind CSS | 3.4.16 |
+| Data Fetching | TanStack React Query | 5.62.2 |
+| HTTP Client | Axios | 1.15.1 |
+| Routing | React Router | 6.28.0 |
+| Icons | Lucide React | 0.462.0 |
+| Backend | Express | 4.21.2 |
+| Auth | jsonwebtoken | 9.0.2 |
+| Hashing | bcrypt | 5.1.1 |
+| Database | MySQL 8+ (mysql2) | 3.11.3 |
+| Validation | Zod | 3.23.8 |
+| Security | Helmet | 7.1.0 |
+| Rate Limiting | express-rate-limit | 7.4.1 |
+| Logging | Morgan | 1.10.0 |
+| UUID | uuid | 10.0.0 |
+
+---
+
+## File Organization
 
 ```
 docs/
-├── README.md (this file)
-├── IMPLEMENTATION_UPDATE.md ⭐ CURRENT STATUS
-├── EXEC_SUMMARY.md
-├── PRODUCTION_READINESS.md (detailed issues & plan)
-├── QUICK_FIX_GUIDE.md (template files to copy)
-├── CLIENT_ARCHITECTURE.md (frontend analysis)
-├── SERVER_ARCHITECTURE.md (backend analysis)
-├── TEST_DATABASE_SETUP.md (schema + seed guide)
-└── NON_TECH_USER_GUIDE.md (simple business guide)
+├── README.md                   (this file — documentation index)
+├── IMPLEMENTATION_UPDATE.md    (authoritative current status)
+├── EXEC_SUMMARY.md             (executive summary)
+├── PRODUCTION_READINESS.md     (production checklist)
+├── QUICK_FIX_GUIDE.md          (historical setup templates)
+├── CLIENT_ARCHITECTURE.md      (frontend architecture)
+├── SERVER_ARCHITECTURE.md      (backend architecture)
+├── TEST_DATABASE_SETUP.md      (database setup guide)
+└── NON_TECH_USER_GUIDE.md      (business user guide)
 ```
 
 ---
 
-## 💾 Supporting Evidence
-
-All findings based on:
-- Source code inspection: 50+ files examined
-- Architecture analysis: Full dependency mapping
-- Configuration review: All existing configs analyzed
-- Gap analysis: 36 specific issues documented
-- Database review: Schema and migrations reviewed
-
----
-
-## 🔐 Security Notes
-
-**Current Issues**:
-- No input validation
-- No rate limiting
-- No security headers
-- Generic error messages (good for production)
-- No password hashing visible
-
-**Before Production**:
-- [ ] Add Helmet for security headers
-- [ ] Add rate limiting (express-rate-limit)
-- [ ] Add input validation (Joi)
-- [ ] Add password hashing (bcrypt)
-- [ ] Security audit
-
----
-
-## 📞 Questions?
-
-Refer to the specific document:
-- **"How does auth work?"** → SERVER_ARCHITECTURE (Auth Routes section)
-- **"What's the database structure?"** → SERVER_ARCHITECTURE (Database Schema)
-- **"What's missing?"** → PRODUCTION_READINESS (Critical Issues)
-- **"How do I start?"** → QUICK_FIX_GUIDE (Installation Steps)
-- **"What's the timeline?"** → PRODUCTION_READINESS (Action Plan) or EXEC_SUMMARY
-- **"Is it safe to deploy?"** → EXEC_SUMMARY (TL;DR: NO)
-
----
-
-## 📊 Metrics
-
-| Metric | Value |
-|--------|-------|
-| Total Issues Found | 36 |
-| Critical Issues | 11 |
-| Code Files Missing | 50+ |
-| Configuration Files Missing | 7 |
-| Database Tables Needed | 10 |
-| Estimated Development Time | 200-300 hours |
-| Estimated QA Time | 50-100 hours |
-| Team Size Recommended | 3-4 developers |
-| Minimum Timeline to Production | 14-21 days |
-| Realistic Timeline | 30 days |
-
----
-
-## 🎯 Success Criteria
-
-System is ready for production when:
-
-- [ ] Both servers start without errors
-- [ ] Database connection works
-- [ ] Can log in with test credentials
-- [ ] Dashboard loads with data
-- [ ] Can CRUD employees
-- [ ] Salary calculations run
-- [ ] No console errors
-- [ ] All API endpoints respond
-- [ ] Security audit passed
-- [ ] Load tested successfully
-
----
-
-## 📝 Version History
-
-| Date | Status | Next Review |
-|------|--------|------------|
-| 2026-04-12 | Analysis Complete | After Phase 1 |
-| TBD | Phase 1 Complete | After Phase 2 |
-| TBD | Phase 2 Complete | After Security |
-| TBD | Testing Complete | Before Production |
-
----
-
-## ⚠️ Deployment Warning
+## Deployment Warning
 
 ```
 Do not deploy directly to production without:
@@ -314,23 +197,3 @@ Do not deploy directly to production without:
 
 Current state: runnable MVP, not production-certified.
 ```
-
----
-
-## 📄 Document Summary
-
-| Doc | Pages | Focus | Read Time |
-|-----|-------|-------|-----------|
-| EXEC_SUMMARY | 3 | Overview | 5 min |
-| PRODUCTION_READINESS | 6 | Issues & Plan | 20 min |
-| QUICK_FIX_GUIDE | 3 | Implementation | 2-3 hrs |
-| CLIENT_ARCHITECTURE | 3 | Frontend | 15 min |
-| SERVER_ARCHITECTURE | 4 | Backend | 15 min |
-
-**Total**: ~20 pages of documentation created
-
----
-
-**Last Updated**: April 12, 2026, 21:00 UTC  
-**Status**: 🟡 MVP Implemented, Production hardening pending  
-**Recommendation**: Follow IMPLEMENTATION_UPDATE + production checklist

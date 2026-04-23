@@ -43,8 +43,12 @@ api.interceptors.response.use(
 );
 
 // Auth API
+// PUBLIC_INTERFACE
+/**
+ * Authentication API methods for login, register, logout, and current user retrieval.
+ */
 export const authAPI = {
-  register: async (payload: { username: string; password: string; fullName: string; role?: 'ADMIN' | 'EMPLOYEE' }) => {
+  register: async (payload: { username: string; password: string; fullName: string; role?: 'ADMIN' | 'MANAGER' }) => {
     const response = await api.post('/auth/register', payload);
     return response.data;
   },
@@ -62,6 +66,10 @@ export const authAPI = {
 };
 
 // Dashboard API
+// PUBLIC_INTERFACE
+/**
+ * Dashboard API methods for fetching statistics and analytics data.
+ */
 export const dashboardAPI = {
   getStats: async () => {
     const response = await api.get('/dashboard/stats');
@@ -90,6 +98,10 @@ export const dashboardAPI = {
 };
 
 // Employees API
+// PUBLIC_INTERFACE
+/**
+ * Employee management API methods for CRUD operations on employee records.
+ */
 export const employeesAPI = {
   getAll: async (params?: Record<string, unknown>) => {
     const response = await api.get('/employees', { params });
@@ -124,6 +136,10 @@ export const employeesAPI = {
 };
 
 // Salary History API
+// PUBLIC_INTERFACE
+/**
+ * Salary history API methods for tracking employee salary changes over time.
+ */
 export const salaryHistoryAPI = {
   getByEmployee: async (employeeId: string) => {
     const response = await api.get(`/salary-history/employee/${employeeId}`);
@@ -142,6 +158,10 @@ export const salaryHistoryAPI = {
 };
 
 // Holidays API
+// PUBLIC_INTERFACE
+/**
+ * Holidays API methods for managing public holidays and their types.
+ */
 export const holidaysAPI = {
   getAll: async (params?: { from?: string; to?: string }) => {
     const response = await api.get('/holidays', { params });
@@ -151,11 +171,11 @@ export const holidaysAPI = {
     const response = await api.get(`/holidays/${id}`);
     return response.data;
   },
-  create: async (data: { date: string; name: string; type: 'PAID' | 'UNPAID'; scope?: string }) => {
+  create: async (data: { date: string; name: string; type: 'PAID' | 'UNPAID'; scope?: string; employeeIds?: string[] }) => {
     const response = await api.post('/holidays', data);
     return response.data;
   },
-  update: async (id: string, data: Partial<{ date: string; name: string; type: 'PAID' | 'UNPAID'; scope: string }>) => {
+  update: async (id: string, data: Partial<{ date: string; name: string; type: 'PAID' | 'UNPAID'; scope: string; employeeIds?: string[] }>) => {
     const response = await api.put(`/holidays/${id}`, data);
     return response.data;
   },
@@ -163,9 +183,23 @@ export const holidaysAPI = {
     const response = await api.delete(`/holidays/${id}`);
     return response.data;
   },
+  /** Update employee assignments for a PER_EMPLOYEE holiday */
+  updateEmployees: async (id: string, employeeIds: string[]) => {
+    const response = await api.put(`/holidays/${id}/employees`, { employeeIds });
+    return response.data;
+  },
+  /** Get holidays applicable to a specific employee */
+  getByEmployee: async (employeeId: string, params?: { from?: string; to?: string }) => {
+    const response = await api.get(`/holidays/employee/${employeeId}`, { params });
+    return response.data;
+  },
 };
 
 // Attendance API
+// PUBLIC_INTERFACE
+/**
+ * Attendance API methods for recording and viewing employee attendance.
+ */
 export const attendanceAPI = {
   getAll: async (params?: Record<string, unknown>) => {
     const response = await api.get('/attendance', { params });
@@ -190,6 +224,10 @@ export const attendanceAPI = {
 };
 
 // Loans API
+// PUBLIC_INTERFACE
+/**
+ * Loans API methods for managing employee loans with MONTHLY and DAILY repayment modes.
+ */
 export const loansAPI = {
   getAll: async (params?: Record<string, unknown>) => {
     const response = await api.get('/loans', { params });
@@ -215,9 +253,45 @@ export const loansAPI = {
     const response = await api.put(`/loans/installments/${installmentId}`, data);
     return response.data;
   },
+  /**
+   * Early-settle an ACTIVE loan: marks it PAID and closes all pending installments.
+   * @param id - Loan UUID
+   * @param notes - Optional settlement notes
+   */
+  settle: async (id: string, notes?: string) => {
+    const response = await api.post(`/loans/${id}/settle`, { notes });
+    return response.data;
+  },
+  /**
+   * Extend a MONTHLY ACTIVE loan by adding extra monthly installments.
+   * @param id - Loan UUID
+   * @param numInstallments - Number of extra months to add (1-60)
+   * @param installmentAmount - Optional fixed amount per new installment;
+   *                            defaults to remaining_balance / numInstallments
+   * @param notes - Optional notes
+   */
+  extend: async (
+    id: string,
+    numInstallments: number,
+    installmentAmount?: number,
+    notes?: string,
+  ) => {
+    const response = await api.post(`/loans/${id}/extend`, {
+      numInstallments,
+      installmentAmount,
+      notes,
+    });
+    return response.data;
+  },
 };
 
 // Advance Salaries API
+// PUBLIC_INTERFACE
+/**
+ * Advance salaries API methods for creating, viewing, and managing salary advances.
+ * Supports approval workflow (PENDING/APPROVED/REJECTED) that integrates with
+ * daily salary releases — only APPROVED advances are deducted.
+ */
 export const advanceSalariesAPI = {
   getAll: async (params?: Record<string, unknown>) => {
     const response = await api.get('/advance-salaries', { params });
@@ -233,9 +307,18 @@ export const advanceSalariesAPI = {
     const response = await api.get(`/advance-salaries/employee/${employeeId}`);
     return response.data;
   },
+  /** Update the status of an advance salary (approve/reject) */
+  updateStatus: async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
+    const response = await api.put(`/advance-salaries/${id}/status`, { status });
+    return response.data;
+  },
 };
 
 // Salary API
+// PUBLIC_INTERFACE
+/**
+ * Salary calculation API methods for computing and viewing salary records.
+ */
 export const salaryAPI = {
   calculate: async (data: unknown) => {
     const response = await api.post('/salary/calculate', data);
@@ -248,6 +331,10 @@ export const salaryAPI = {
 };
 
 // Departments API
+// PUBLIC_INTERFACE
+/**
+ * Departments API methods for CRUD operations on departments.
+ */
 export const departmentsAPI = {
   getAll: async () => {
     const response = await api.get('/departments');
@@ -272,6 +359,10 @@ export const departmentsAPI = {
 };
 
 // Roles API
+// PUBLIC_INTERFACE
+/**
+ * Roles API methods for managing employee roles and their configurations.
+ */
 export const rolesAPI = {
   getAll: async (params?: Record<string, unknown>) => {
     const response = await api.get('/roles', { params });
@@ -300,6 +391,10 @@ export const rolesAPI = {
 };
 
 // Audit Logs API
+// PUBLIC_INTERFACE
+/**
+ * Audit logs API methods for viewing system audit trail.
+ */
 export const auditLogsAPI = {
   getAll: async (params?: Record<string, unknown>) => {
     const response = await api.get('/audit-logs', { params });
@@ -308,6 +403,102 @@ export const auditLogsAPI = {
   verifyPasskey: async (passkey: string) => {
     const response = await api.post('/audit-logs/verify-passkey', { passkey });
     return response.data;
+  },
+};
+
+// Daily Salary Releases API
+// PUBLIC_INTERFACE
+/**
+ * Client API methods for daily salary release management.
+ * Supports generating, viewing, releasing, and deleting daily salary payouts
+ * for daily-wage employees. Also provides employee-specific history access.
+ */
+export const dailyReleasesAPI = {
+  /** Generate daily release records for a given date */
+  generate: async (date: string) => {
+    const response = await api.post('/daily-releases/generate', { date });
+    return response.data;
+  },
+  /** Get all daily releases for a given date */
+  getAll: async (date: string) => {
+    const response = await api.get('/daily-releases', { params: { date } });
+    return response.data;
+  },
+  /** Get daily release history for a specific employee */
+  getByEmployee: async (employeeId: string, params?: { from?: string; to?: string }) => {
+    const response = await api.get(`/daily-releases/employee/${employeeId}`, { params });
+    return response.data;
+  },
+  /** Mark a single daily release as RELEASED */
+  release: async (id: string) => {
+    const response = await api.put(`/daily-releases/${id}/release`);
+    return response.data;
+  },
+  /** Bulk release all pending daily salaries for a date */
+  releaseAll: async (date: string) => {
+    const response = await api.put('/daily-releases/release-all', { date });
+    return response.data;
+  },
+  /** Delete a PENDING daily release record */
+  deleteRelease: async (id: string) => {
+    const response = await api.delete(`/daily-releases/${id}`);
+    return response.data;
+  },
+};
+
+// Exports API
+// PUBLIC_INTERFACE
+/**
+ * Exports API methods for downloading CSV/HTML reports for payroll, attendance, loans,
+ * and generating printable payslips.
+ */
+export const exportsAPI = {
+  /** Download payroll report as CSV or open as HTML for printing/PDF */
+  getPayrollExport: (params?: Record<string, string>) => {
+    const query = new URLSearchParams(params).toString();
+    return `${API_BASE_URL}/exports/payroll?${query}`;
+  },
+  /** Download attendance report as CSV or open as HTML for printing/PDF */
+  getAttendanceExport: (params?: Record<string, string>) => {
+    const query = new URLSearchParams(params).toString();
+    return `${API_BASE_URL}/exports/attendance?${query}`;
+  },
+  /** Download loans report as CSV or open as HTML for printing/PDF */
+  getLoansExport: (params?: Record<string, string>) => {
+    const query = new URLSearchParams(params).toString();
+    return `${API_BASE_URL}/exports/loans?${query}`;
+  },
+  /** Generate payslip HTML for an employee for a given month */
+  getPayslipUrl: (employeeId: string, month: string) => {
+    return `${API_BASE_URL}/exports/payslip/${employeeId}?month=${month}`;
+  },
+};
+
+// Self-Service API
+// PUBLIC_INTERFACE
+/**
+ * Self-service API methods for employees to access their own records.
+ * Maps the authenticated user to their employee record.
+ */
+export const selfServiceAPI = {
+  getProfile: async () => {
+    const response = await api.get('/self-service/profile');
+    return response.data;
+  },
+  getSalaryHistory: async () => {
+    const response = await api.get('/self-service/salary-history');
+    return response.data;
+  },
+  getAttendance: async (params?: { from?: string; to?: string }) => {
+    const response = await api.get('/self-service/attendance', { params });
+    return response.data;
+  },
+  getLoans: async () => {
+    const response = await api.get('/self-service/loans');
+    return response.data;
+  },
+  getPayslipUrl: (month: string) => {
+    return `${API_BASE_URL}/self-service/payslip?month=${month}`;
   },
 };
 

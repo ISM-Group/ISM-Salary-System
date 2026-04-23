@@ -61,7 +61,25 @@ const deleteDepartment = async (req, res) => {
         res.status(404).json({ error: 'Department not found' });
         return;
     }
-    await (0, db_1.execute)('DELETE FROM departments WHERE id = ?', [req.params.id]);
-    res.json({ message: 'Department deleted successfully' });
+    // Prevent deleting a department that still has employees
+    try {
+        const depCountRow = await (0, db_1.queryOne)('SELECT COUNT(*) as count FROM employees WHERE department_id = ?', [req.params.id]);
+        const depCount = depCountRow ? parseInt(depCountRow.count || '0', 10) : 0;
+        if (depCount > 0) {
+            res.status(409).json({ error: 'Cannot delete department with assigned employees. Reassign or remove employees first.' });
+            return;
+        }
+        await (0, db_1.execute)('DELETE FROM departments WHERE id = ?', [req.params.id]);
+        res.json({ message: 'Department deleted successfully' });
+    }
+    catch (error) {
+        console.error('Delete department error:', error);
+        // Handle foreign key constraint error explicitly
+        if (error && (error.code === 'ER_ROW_IS_REFERENCED_2' || error.errno === 1451)) {
+            res.status(409).json({ error: 'Cannot delete department; it has related records.' });
+            return;
+        }
+        res.status(500).json({ error: 'Internal server error' });
+    }
 };
 exports.deleteDepartment = deleteDepartment;

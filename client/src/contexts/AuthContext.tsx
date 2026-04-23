@@ -5,7 +5,7 @@ type User = {
   id: string;
   username: string;
   full_name: string;
-  role: string;
+  role: 'ADMIN' | 'MANAGER';
 };
 
 type AuthContextValue = {

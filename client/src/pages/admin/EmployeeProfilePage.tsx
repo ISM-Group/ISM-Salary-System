@@ -393,22 +393,14 @@ export function EmployeeProfilePage() {
           </CardHeader>
           <CardContent>
             {attendanceSummary && (
-              <div className="grid gap-4 md:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="text-sm text-muted-foreground">Present Days</p>
                   <p className="text-2xl font-bold">{attendanceSummary.presentDays}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Half Days</p>
-                  <p className="text-2xl font-bold">{attendanceSummary.halfDays}</p>
-                </div>
-                <div>
                   <p className="text-sm text-muted-foreground">Absent Days</p>
                   <p className="text-2xl font-bold">{attendanceSummary.absentDays}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Other</p>
-                  <p className="text-2xl font-bold">{attendanceSummary.otherDays}</p>
                 </div>
               </div>
             )}
