@@ -24,6 +24,7 @@ jobs:
         with:
           node-version: '18'
           cache: 'npm'
+          cache-dependency-path: client/package-lock.json
 
       - name: Install & Build Client
         working-directory: ./client
