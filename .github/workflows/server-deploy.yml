@@ -1,4 +1,4 @@
-name: Deploy server to VPS
+name: Deploy Server to VPS
 
 permissions:
   contents: read
@@ -8,15 +8,15 @@ on:
     branches: [ main ]
     paths:
       - 'server/**'
+      - '.github/workflows/server-deploy.yml'
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
+    name: Build & Deploy Server
     runs-on: ubuntu-latest
-    env:
-      NODE_ENV: production
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -25,29 +25,104 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install server dependencies
-        working-directory: server
-        run: npm ci
+      - name: Install & Build Server
+        working-directory: ./server
+        env:
+          NODE_ENV: production
+        run: |
+          npm ci
+          npm run build
+          rm -rf node_modules
 
-      - name: Build server
-        working-directory: server
-        run: npm run build
+      - name: Compress Server Build
+        run: |
+          tar -czf server-deploy.tar.gz -C server dist/ package.json
 
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.7.0
+      - name: Transfer Build to VPS
+        uses: appleboy/scp-action@v0.1.7
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "server-deploy.tar.gz"
+          target: "/tmp"
 
-      - name: Add VPS to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts || true
+      - name: Extract & Deploy Server on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
 
-      - name: Sync server build to VPS
-        run: |
-          rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" server/dist/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/deploy/ism-server/dist/
-          rsync -avz -e "ssh -o StrictHostKeyChecking=no" server/package*.json ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/home/deploy/ism-server/
+            SERVER_PATH="/home/deploy/ism-server"
+            BACKUP_PATH="/home/deploy/ism-server-backup"
+            TEMP_DIR="/tmp"
+            PM2_NAME="ism-server"
 
-      - name: Remote deploy: install & restart
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "cd /home/deploy/ism-server && npm ci --production && pm2 restart ism-server || pm2 start dist/server.js --name ism-server"
+            echo "=========================================="
+            echo "Starting Server Deployment..."
+            echo "=========================================="
+
+            # Create backup
+            if [ -d "$SERVER_PATH/dist" ]; then
+              echo "[INFO] Creating backup of current deployment..."
+              rm -rf "$BACKUP_PATH"
+              mkdir -p "$BACKUP_PATH"
+              cp -r "$SERVER_PATH/dist" "$BACKUP_PATH/"
+              cp -r "$SERVER_PATH/node_modules" "$BACKUP_PATH/" 2>/dev/null || true
+              echo "[INFO] Backup created at $BACKUP_PATH"
+            fi
+
+            # Extract new build
+            echo "[INFO] Extracting new build..."
+            mkdir -p "$SERVER_PATH"
+            tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$SERVER_PATH" --strip-components=1
+
+            # Verify build
+            if [ ! -d "$SERVER_PATH/dist" ]; then
+              echo "[ERROR] Server deployment failed - dist/ not found"
+              echo "[INFO] Restoring from backup..."
+              rm -rf "$SERVER_PATH/dist"
+              rm -rf "$SERVER_PATH/node_modules"
+              cp -r "$BACKUP_PATH/dist" "$SERVER_PATH/"
+              cp -r "$BACKUP_PATH/node_modules" "$SERVER_PATH/" 2>/dev/null || true
+              exit 1
+            fi
+
+            # Install dependencies
+            echo "[INFO] Installing production dependencies..."
+            cd "$SERVER_PATH"
+            npm ci --production
+
+            # Check if PM2 is available
+            if ! command -v pm2 &> /dev/null; then
+              echo "[ERROR] PM2 is not installed on VPS"
+              exit 1
+            fi
+
+            # Reload PM2 process
+            echo "[INFO] Reloading PM2 process: $PM2_NAME"
+            if pm2 info "$PM2_NAME" > /dev/null 2>&1; then
+              pm2 restart "$PM2_NAME" --update-env
+              echo "[SUCCESS] Process $PM2_NAME restarted"
+            else
+              echo "[INFO] Process not running, starting new instance..."
+              pm2 start dist/server.js --name "$PM2_NAME" --update-env
+              echo "[SUCCESS] Process $PM2_NAME started"
+            fi
+
+            pm2 save
+
+            # Verify PM2 status
+            echo "[INFO] Verifying process status..."
+            pm2 info "$PM2_NAME"
+
+            # Cleanup
+            rm -f "$TEMP_DIR/server-deploy.tar.gz"
+            echo "[INFO] Cleanup completed"
+
+            echo "=========================================="
+            echo "Server Deployment Complete!"
+            echo "=========================================="

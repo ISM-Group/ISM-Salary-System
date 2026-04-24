@@ -50,7 +50,13 @@ env:
 
 ---
 
-## 2. DNS Records Setup for `salary.ismgroups.lk`
+## 2. DNS Records Setup
+
+### Setup Details
+
+Two subdomains:
+- `salary.ismgroups.lk` → Client (React app on Nginx)
+- `api.salary.ismgroups.lk` → API (Node.js backend on localhost:5001)
 
 ### Step 1: Get your VPS IP address
 
@@ -63,18 +69,31 @@ curl -s http://ifconfig.me
 
 Login to `ismgroups.lk` domain registrar (e.g., NameSilo, Godaddy, etc.).
 
-**A record (required):**
+**A record 1 (client subdomain):**
 ```
 Type:   A
-Name:   salary          (or just @salary if using subdomain input)
+Name:   salary
 Value:  YOUR_VPS_IP     (e.g., 203.0.113.42)
 TTL:    3600            (1 hour, or Auto)
 ```
 
-**Optional: AAAA record (IPv6, if your VPS has IPv6):**
+**A record 2 (API subdomain):**
+```
+Type:   A
+Name:   api.salary (or just 'api' depending on registrar)
+Value:  YOUR_VPS_IP     (same VPS IP as above)
+TTL:    3600            (1 hour, or Auto)
+```
+
+**Optional: AAAA records (IPv6, if your VPS has IPv6):**
 ```
 Type:   AAAA
 Name:   salary
+Value:  YOUR_VPS_IPV6
+TTL:    3600
+
+Type:   AAAA
+Name:   api.salary
 Value:  YOUR_VPS_IPV6
 TTL:    3600
 ```
@@ -84,11 +103,11 @@ TTL:    3600
 Wait 5-30 minutes, then test:
 ```bash
 nslookup salary.ismgroups.lk
-# or
-dig salary.ismgroups.lk
-```
+# Should show: Address: 203.0.113.42
 
-You should see your VPS IP in the output.
+nslookup api.salary.ismgroups.lk
+# Should show: Address: 203.0.113.42
+```
 
 ---
 
@@ -150,11 +169,12 @@ sudo apt update
 sudo apt install -y nginx certbot python3-certbot-nginx
 ```
 
-### Step 2: Create Nginx server block
+### Step 2: Create Nginx server blocks
 
-Create file: `/etc/nginx/sites-available/ism-salary`
+Create file: `/etc/nginx/sites-available/ism-salary` with two separate server blocks:
 
 ```nginx
+# ============ CLIENT: salary.ismgroups.lk ============
 # Redirect HTTP to HTTPS
 server {
     listen 80;
@@ -163,7 +183,7 @@ server {
     return 301 https://$server_name$request_uri;
 }
 
-# HTTPS server block
+# HTTPS server block for client
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
@@ -176,7 +196,7 @@ server {
     ssl_ciphers HIGH:!aNULL:!MD5;
     ssl_prefer_server_ciphers on;
 
-    # Client (static assets)
+    # Client (static assets - React app)
     location / {
         root /var/www/ism-client;
         try_files $uri $uri/ /index.html;
@@ -184,8 +204,36 @@ server {
         add_header Cache-Control "public, max-age=3600";
     }
 
-    # API proxy to backend
-    location /api/ {
+    # Deny access to sensitive files
+    location ~ /\. {
+        deny all;
+    }
+}
+
+# ============ API: api.salary.ismgroups.lk ============
+# Redirect HTTP to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api.salary.ismgroups.lk;
+    return 301 https://$server_name$request_uri;
+}
+
+# HTTPS server block for API
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name api.salary.ismgroups.lk;
+
+    # SSL certificates (will be added by Certbot)
+    ssl_certificate /etc/letsencrypt/live/api.salary.ismgroups.lk/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.salary.ismgroups.lk/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # API proxy to backend (all traffic goes to Node.js)
+    location / {
         proxy_pass http://localhost:5001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -198,12 +246,6 @@ server {
         proxy_connect_timeout 60s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;
-    }
-
-    # Health check endpoint (optional)
-    location /health {
-        proxy_pass http://localhost:5001/health;
-        access_log off;
     }
 
     # Deny access to sensitive files
@@ -226,18 +268,24 @@ sudo systemctl reload nginx
 
 ### Step 4: Setup SSL with Let's Encrypt (Certbot)
 
+Generate SSL certificates for **both subdomains**:
+
 ```bash
 sudo certbot certonly --nginx -d salary.ismgroups.lk
+sudo certbot certonly --nginx -d api.salary.ismgroups.lk
 ```
 
 Follow the prompts. Certbot will:
 - Validate domain ownership
-- Install SSL certificates to `/etc/letsencrypt/live/salary.ismgroups.lk/`
+- Install SSL certificates to:
+  - `/etc/letsencrypt/live/salary.ismgroups.lk/`
+  - `/etc/letsencrypt/live/api.salary.ismgroups.lk/`
 - Auto-renew (cron job added)
 
 Verify SSL:
 ```bash
 curl -I https://salary.ismgroups.lk
+curl -I https://api.salary.ismgroups.lk
 ```
 
 ---

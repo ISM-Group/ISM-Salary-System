@@ -1,4 +1,4 @@
-name: Deploy client to VPS
+name: Deploy Client to VPS
 
 permissions:
   contents: read
@@ -8,15 +8,15 @@ on:
     branches: [ main ]
     paths:
       - 'client/**'
+      - '.github/workflows/client-deploy.yml'
   workflow_dispatch:
 
 jobs:
   build-and-deploy:
+    name: Build & Deploy Client
     runs-on: ubuntu-latest
-    env:
-      CI: true
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -25,28 +25,84 @@ jobs:
           node-version: '18'
           cache: 'npm'
 
-      - name: Install dependencies
-        working-directory: client
-        run: npm ci
+      - name: Install & Build Client
+        working-directory: ./client
+        env:
+          CI: true
+        run: |
+          npm ci
+          npm run build
+          rm -rf node_modules
 
-      - name: Build client
-        working-directory: client
-        run: npm run build
+      - name: Compress Client Build
+        run: |
+          tar -czf client-deploy.tar.gz -C client dist/
 
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.7.0
+      - name: Transfer Build to VPS
+        uses: appleboy/scp-action@v0.1.7
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "client-deploy.tar.gz"
+          target: "/tmp"
 
-      - name: Add VPS to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts || true
+      - name: Extract & Deploy Client on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            set -e
 
-      - name: Sync dist to VPS
-        run: |
-          rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" client/dist/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/ism-client
+            CLIENT_PATH="/var/www/ism-client"
+            BACKUP_PATH="/var/www/ism-client-backup"
+            TEMP_DIR="/tmp"
 
-      - name: Reload nginx (optional)
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} "sudo systemctl reload nginx || true"
+            echo "=========================================="
+            echo "Starting Client Deployment..."
+            echo "=========================================="
+
+            # Create backup
+            if [ -d "$CLIENT_PATH" ]; then
+              echo "[INFO] Creating backup of current deployment..."
+              rm -rf "$BACKUP_PATH"
+              cp -r "$CLIENT_PATH" "$BACKUP_PATH"
+              echo "[INFO] Backup created at $BACKUP_PATH"
+            fi
+
+            # Extract new build
+            echo "[INFO] Extracting new build..."
+            mkdir -p "$CLIENT_PATH"
+            rm -rf "$CLIENT_PATH"/*
+            tar -xzf "$TEMP_DIR/client-deploy.tar.gz" -C "$CLIENT_PATH" --strip-components=1
+
+            # Verify deployment
+            if [ ! -d "$CLIENT_PATH/dist" ]; then
+              echo "[ERROR] Client deployment failed - dist/ not found"
+              echo "[INFO] Restoring from backup..."
+              rm -rf "$CLIENT_PATH"
+              cp -r "$BACKUP_PATH" "$CLIENT_PATH"
+              exit 1
+            fi
+
+            echo "[INFO] Client build deployed successfully"
+            
+            # Reload Nginx
+            echo "[INFO] Reloading Nginx..."
+            sudo systemctl reload nginx
+            
+            if [ $? -eq 0 ]; then
+              echo "[SUCCESS] Nginx reloaded successfully"
+            else
+              echo "[WARNING] Failed to reload Nginx, but deployment is complete"
+            fi
+
+            # Cleanup
+            rm -f "$TEMP_DIR/client-deploy.tar.gz"
+            echo "[INFO] Cleanup completed"
+
+            echo "=========================================="
+            echo "Client Deployment Complete!"
+            echo "=========================================="

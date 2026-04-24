@@ -23,7 +23,9 @@
 ## Phase 2: DNS Setup (10-30 min, wait for propagation)
 
 **Your Domain:** `ismgroups.lk`  
-**Subdomain:** `salary.ismgroups.lk`
+**Subdomains:**
+- `salary.ismgroups.lk` → Client (React app)
+- `api.salary.ismgroups.lk` → API backend (Node.js)
 
 ### Step 1: Get VPS IP
 ```bash
@@ -32,13 +34,18 @@ curl -s http://ifconfig.me
 # Output example: 203.0.113.42
 ```
 
-### Step 2: Add DNS record
+### Step 2: Add DNS records (2 A records)
 - Login to your domain registrar (NameSilo, GoDaddy, etc.)
 - Go to DNS settings for `ismgroups.lk`
-- **Add A record:**
+- **Add first A record (client):**
   - Type: `A`
   - Name: `salary`
   - Value: `203.0.113.42` (your VPS IP)
+  - TTL: `3600` (or Auto)
+- **Add second A record (API):**
+  - Type: `A`
+  - Name: `api.salary` (or just `api` depending on registrar)
+  - Value: `203.0.113.42` (same VPS IP)
   - TTL: `3600` (or Auto)
 - Click Save/Update
 
@@ -46,6 +53,9 @@ curl -s http://ifconfig.me
 ```bash
 # Wait 5-30 minutes, then test:
 nslookup salary.ismgroups.lk
+# Should show: Address: 203.0.113.42
+
+nslookup api.salary.ismgroups.lk
 # Should show: Address: 203.0.113.42
 ```
 
@@ -114,18 +124,16 @@ EOF
 chmod 600 /home/deploy/ism-server/.env
 ```
 
-**Generate JWT_SECRET:**
-```bash
-openssl rand -base64 32
-```
+**Note:** `CLIENT_URL` points to the client subdomain (`salary.ismgroups.lk`). The server runs on `localhost:5001` and is proxied by Nginx from `api.salary.ismgroups.lk`.
 
 ---
 
 ## Phase 5: Nginx Configuration (10 min)
 
-Create Nginx config:
+Create Nginx config with two separate server blocks (one for client, one for API):
 ```bash
 sudo cat > /etc/nginx/sites-available/ism-salary << 'EOF'
+# ============ CLIENT: salary.ismgroups.lk ============
 # HTTP to HTTPS redirect
 server {
     listen 80;
@@ -134,7 +142,7 @@ server {
     return 301 https://$server_name$request_uri;
 }
 
-# HTTPS server
+# HTTPS client server
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
@@ -146,7 +154,7 @@ server {
     ssl_ciphers HIGH:!aNULL:!MD5;
     ssl_prefer_server_ciphers on;
 
-    # Client static files
+    # Client static files (React app)
     location / {
         root /var/www/ism-client;
         try_files $uri $uri/ /index.html;
@@ -154,8 +162,34 @@ server {
         add_header Cache-Control "public, max-age=3600";
     }
 
-    # API proxy to backend
-    location /api/ {
+    location ~ /\. {
+        deny all;
+    }
+}
+
+# ============ API: api.salary.ismgroups.lk ============
+# HTTP to HTTPS redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name api.salary.ismgroups.lk;
+    return 301 https://$server_name$request_uri;
+}
+
+# HTTPS API server
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name api.salary.ismgroups.lk;
+
+    ssl_certificate /etc/letsencrypt/live/api.salary.ismgroups.lk/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/api.salary.ismgroups.lk/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # All traffic to backend
+    location / {
         proxy_pass http://localhost:5001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -165,11 +199,9 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
-    }
-
-    location /health {
-        proxy_pass http://localhost:5001/health;
-        access_log off;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
     }
 
     location ~ /\. {
@@ -191,18 +223,29 @@ sudo systemctl reload nginx
 
 ---
 
-## Phase 6: SSL Certificate (5 min)
+## Phase 6: SSL Certificates (5-10 min)
+
+Generate SSL certificates for **both subdomains**:
 
 ```bash
+# Certificate for client subdomain
 sudo certbot certonly --nginx -d salary.ismgroups.lk
-# Follow prompts, select standalone or nginx method
-# Certificates installed to: /etc/letsencrypt/live/salary.ismgroups.lk/
+
+# Certificate for API subdomain
+sudo certbot certonly --nginx -d api.salary.ismgroups.lk
 ```
+
+Follow prompts. Certificates installed to:
+- `/etc/letsencrypt/live/salary.ismgroups.lk/`
+- `/etc/letsencrypt/live/api.salary.ismgroups.lk/`
 
 Verify SSL:
 ```bash
 curl -I https://salary.ismgroups.lk
-# Should return 200 OK or 404 (if no files yet)
+# Should return 200 OK or 404 (if no client files deployed yet)
+
+curl -I https://api.salary.ismgroups.lk
+# Should return 502 Bad Gateway (backend not running yet, that's OK)
 ```
 
 ---
@@ -261,8 +304,11 @@ Watch GitHub Actions:
 
 Check live:
 ```bash
+# Client should load
 curl -I https://salary.ismgroups.lk
-curl https://salary.ismgroups.lk/api/health
+
+# API health check (if backend has /health endpoint)
+curl https://api.salary.ismgroups.lk/health
 ```
 
 ---
@@ -273,8 +319,8 @@ curl https://salary.ismgroups.lk/api/health
 
 ```bash
 # From your local machine:
-curl -I https://salary.ismgroups.lk                    # Should return 200
-curl https://salary.ismgroups.lk/api/health            # Should return API response
+curl -I https://salary.ismgroups.lk                    # Client should return 200
+curl -I https://api.salary.ismgroups.lk                # API should return 200 or API response
 
 # SSH to VPS and check:
 pm2 status                                              # ism-server should be online
@@ -320,12 +366,12 @@ git push origin main                # Triggers GitHub Actions
 ## Troubleshooting Quick Fixes
 
 | Problem | Quick Fix |
-|---------|-----------|
-| DNS not working | Wait 30 min, check A record in registrar, verify `nslookup salary.ismgroups.lk` |
-| 502 Bad Gateway | SSH to VPS, run `pm2 status` and `pm2 logs ism-server` |
-| SSL not working | Run `sudo certbot certonly --nginx -d salary.ismgroups.lk` again |
-| Nginx returns 404 | Check files in `/var/www/ism-client`, run client workflow |
-| API fails | Check Nginx proxy config, verify backend runs on `localhost:5001` |
+|---------|----------|
+| DNS not working | Wait 30 min, check **both A records** in registrar, verify `nslookup salary.ismgroups.lk` and `nslookup api.salary.ismgroups.lk` |
+| 502 Bad Gateway on api subdomain | SSH to VPS, run `pm2 status` and `pm2 logs ism-server` |
+| SSL not working | Run `sudo certbot certonly --nginx -d salary.ismgroups.lk` AND `sudo certbot certonly --nginx -d api.salary.ismgroups.lk` |
+| Client page returns 404 | Check files in `/var/www/ism-client`, run client workflow |
+| API fails to respond | Check Nginx proxy config, verify backend runs on `localhost:5001` |
 | GitHub Actions fails | Check Secret values, verify SSH key permissions (600), check action logs |
 
 ---
