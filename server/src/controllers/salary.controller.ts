@@ -236,30 +236,33 @@ export const getSalaryHistory = async (req: AuthRequest, res: Response): Promise
   const { employeeId, from, to } = req.query as Record<string, string | undefined>;
   const pagination = parsePagination(req.query as Record<string, unknown>);
 
-  const selectFields = `id, employee_id as employeeId, month, total_salary as totalSalary, status,
-           daily_wage_total as dailyWageTotal, bonus, advance_deductions as advanceDeductions,
-           loan_deductions as loanDeductions`;
-  const fromClause = `FROM salary_calculations`;
+  const selectFields = `sc.id, sc.employee_id as employeeId, e.full_name as employeeName,
+           e.employee_id as employeeCode,
+           sc.month, sc.total_salary as totalSalary, sc.status,
+           sc.daily_wage_total as dailyWageTotal, sc.bonus,
+           sc.advance_deductions as advanceDeductions,
+           sc.loan_deductions as loanDeductions`;
+  const fromClause = `FROM salary_calculations sc LEFT JOIN employees e ON e.id = sc.employee_id`;
   let whereClause = 'WHERE 1=1';
   const params: unknown[] = [];
 
   if (employeeId) {
-    whereClause += ' AND employee_id = ?';
+    whereClause += ' AND sc.employee_id = ?';
     params.push(employeeId);
   }
   if (from) {
-    whereClause += ' AND month >= ?';
+    whereClause += ' AND sc.month >= ?';
     params.push(from);
   }
   if (to) {
-    whereClause += ' AND month <= ?';
+    whereClause += ' AND sc.month <= ?';
     params.push(to);
   }
 
   const countResult = await queryOne<{ total: number }>(`SELECT COUNT(*) AS total ${fromClause} ${whereClause}`, params);
   const total = Number(countResult?.total || 0);
 
-  const dataSql = `SELECT ${selectFields} ${fromClause} ${whereClause} ORDER BY month DESC LIMIT ? OFFSET ?`;
+  const dataSql = `SELECT ${selectFields} ${fromClause} ${whereClause} ORDER BY sc.month DESC LIMIT ? OFFSET ?`;
   const rows = await query<any>(dataSql, [...params, pagination.limit, pagination.offset]);
 
   res.json({

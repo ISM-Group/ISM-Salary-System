@@ -2,10 +2,18 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteEmployee = exports.getEmployeeProfile = exports.updateEmployee = exports.createEmployee = exports.getEmployee = exports.getEmployees = void 0;
 const db_1 = require("../utils/db");
+const pagination_1 = require("../utils/pagination");
+/**
+ * GET /employees
+ * Returns the list of employees, optionally filtered by department, active status, or search term.
+ * Supports server-side pagination via ?page=&limit= query parameters.
+ * When no isActive filter is provided, defaults to returning only active employees (is_active = true).
+ */
+// PUBLIC_INTERFACE
 const getEmployees = async (req, res) => {
     const { departmentId, isActive, search } = req.query;
-    let sql = `
-    SELECT
+    const pagination = (0, pagination_1.parsePagination)(req.query);
+    const selectFields = `
       e.id,
       e.employee_id as employeeId,
       e.full_name as fullName,
@@ -24,27 +32,39 @@ const getEmployees = async (req, res) => {
       r.id as roleId,
       r.name as roleName,
       r.daily_wage as roleDailyWage
+  `;
+    const fromClause = `
     FROM employees e
     LEFT JOIN departments d ON d.id = e.department_id
     LEFT JOIN roles r ON r.id = e.role_id
-    WHERE 1=1
   `;
+    let whereClause = ' WHERE 1=1';
     const params = [];
     if (departmentId) {
-        sql += ' AND e.department_id = ?';
+        whereClause += ' AND e.department_id = ?';
         params.push(departmentId);
     }
+    // Default to active employees when no explicit isActive filter is provided.
     if (isActive === 'true' || isActive === 'false') {
-        sql += ' AND e.is_active = ?';
+        whereClause += ' AND e.is_active = ?';
         params.push(isActive === 'true');
     }
+    else {
+        // Default: show only active employees
+        whereClause += ' AND e.is_active = ?';
+        params.push(true);
+    }
     if (search) {
-        sql += ' AND (e.full_name LIKE ? OR e.employee_id LIKE ? OR e.email LIKE ? OR e.phone LIKE ?)';
+        whereClause += ' AND (e.full_name LIKE ? OR e.employee_id LIKE ? OR e.email LIKE ? OR e.phone LIKE ?)';
         const q = `%${search}%`;
         params.push(q, q, q, q);
     }
-    sql += ' ORDER BY e.full_name ASC';
-    const rows = await (0, db_1.query)(sql, params);
+    // Count total for pagination
+    const countResult = await (0, db_1.queryOne)(`SELECT COUNT(*) AS total ${fromClause} ${whereClause}`, params);
+    const total = Number(countResult?.total || 0);
+    // Fetch paginated data
+    const dataSql = `SELECT ${selectFields} ${fromClause} ${whereClause} ORDER BY e.full_name ASC LIMIT ? OFFSET ?`;
+    const rows = await (0, db_1.query)(dataSql, [...params, pagination.limit, pagination.offset]);
     res.json({
         data: rows.map((row) => ({
             id: row.id,
@@ -67,9 +87,15 @@ const getEmployees = async (req, res) => {
                 ? { id: row.roleId, name: row.roleName, dailyWage: row.roleDailyWage ? Number(row.roleDailyWage) : null }
                 : null,
         })),
+        pagination: (0, pagination_1.buildPaginationMeta)(total, pagination),
     });
 };
 exports.getEmployees = getEmployees;
+/**
+ * GET /employees/:id
+ * Returns a single employee by ID.
+ */
+// PUBLIC_INTERFACE
 const getEmployee = async (req, res) => {
     const result = await (0, db_1.queryOne)(`SELECT
       e.id,
@@ -107,6 +133,12 @@ const getEmployee = async (req, res) => {
     });
 };
 exports.getEmployee = getEmployee;
+/**
+ * POST /employees
+ * Creates a new employee record.
+ * Required fields: employeeId, fullName, departmentId, hireDate.
+ */
+// PUBLIC_INTERFACE
 const createEmployee = async (req, res) => {
     const { employeeId, fullName, email, phone, departmentId, roleId, hireDate, salaryType, baseSalary, isActive, addressLine1, addressLine2, city, region, } = req.body;
     if (!employeeId || !fullName || !departmentId || !hireDate) {
@@ -138,6 +170,17 @@ const createEmployee = async (req, res) => {
     res.status(201).json({ data: created });
 };
 exports.createEmployee = createEmployee;
+/**
+ * PUT /employees/:id
+ * Updates an employee record.
+ *
+ * FIX: Replaced COALESCE pattern with explicit field assignments.
+ * The old COALESCE approach made it impossible to clear optional fields once set,
+ * because COALESCE(NULL, current_value) always keeps the old value.
+ * Now, only fields that are explicitly present in the request body are updated.
+ * To clear an optional field, send it with an explicit null value in the payload.
+ */
+// PUBLIC_INTERFACE
 const updateEmployee = async (req, res) => {
     const existing = await (0, db_1.queryOne)('SELECT id FROM employees WHERE id = ?', [req.params.id]);
     if (!existing) {
@@ -145,42 +188,49 @@ const updateEmployee = async (req, res) => {
         return;
     }
     const payload = req.body;
-    await (0, db_1.execute)(`UPDATE employees
-     SET employee_id = COALESCE(?, employee_id),
-         full_name = COALESCE(?, full_name),
-         email = COALESCE(?, email),
-         phone = COALESCE(?, phone),
-         department_id = COALESCE(?, department_id),
-         role_id = COALESCE(?, role_id),
-         hire_date = COALESCE(?, hire_date),
-         salary_type = COALESCE(?, salary_type),
-         base_salary = COALESCE(?, base_salary),
-         is_active = COALESCE(?, is_active),
-         address_line1 = COALESCE(?, address_line1),
-         address_line2 = COALESCE(?, address_line2),
-         city = COALESCE(?, city),
-         region = COALESCE(?, region),
-         updated_at = NOW()
-     WHERE id = ?`, [
-        payload.employeeId ?? null,
-        payload.fullName ?? null,
-        payload.email ?? null,
-        payload.phone ?? null,
-        payload.departmentId ?? null,
-        payload.roleId ?? null,
-        payload.hireDate ?? null,
-        payload.salaryType ?? null,
-        payload.baseSalary ?? null,
-        payload.isActive ?? null,
-        payload.addressLine1 ?? null,
-        payload.addressLine2 ?? null,
-        payload.city ?? null,
-        payload.region ?? null,
-        req.params.id,
-    ]);
+    // Map from payload key -> database column name
+    const fieldMap = {
+        employeeId: 'employee_id',
+        fullName: 'full_name',
+        email: 'email',
+        phone: 'phone',
+        departmentId: 'department_id',
+        roleId: 'role_id',
+        hireDate: 'hire_date',
+        salaryType: 'salary_type',
+        baseSalary: 'base_salary',
+        isActive: 'is_active',
+        addressLine1: 'address_line1',
+        addressLine2: 'address_line2',
+        city: 'city',
+        region: 'region',
+    };
+    const setClauses = [];
+    const params = [];
+    for (const [payloadKey, column] of Object.entries(fieldMap)) {
+        if (payloadKey in payload) {
+            setClauses.push(`${column} = ?`);
+            params.push(payload[payloadKey] ?? null);
+        }
+    }
+    // If no updatable fields were provided, return early
+    if (setClauses.length === 0) {
+        res.status(400).json({ error: 'No updatable fields provided' });
+        return;
+    }
+    // Always update the timestamp
+    setClauses.push('updated_at = NOW()');
+    params.push(req.params.id);
+    await (0, db_1.execute)(`UPDATE employees SET ${setClauses.join(', ')} WHERE id = ?`, params);
     res.json({ message: 'Employee updated successfully' });
 };
 exports.updateEmployee = updateEmployee;
+/**
+ * GET /employees/:id/profile
+ * Returns a comprehensive employee profile including salary history,
+ * loans, advances, and attendance summary.
+ */
+// PUBLIC_INTERFACE
 const getEmployeeProfile = async (req, res) => {
     const employee = await (0, db_1.queryOne)(`SELECT
       e.id, e.employee_id as employeeId, e.full_name as fullName, e.email, e.phone, e.hire_date as hireDate,
@@ -268,13 +318,18 @@ const getEmployeeProfile = async (req, res) => {
     });
 };
 exports.getEmployeeProfile = getEmployeeProfile;
+/**
+ * DELETE /employees/:id
+ * Soft-deletes an employee by setting is_active to false.
+ */
+// PUBLIC_INTERFACE
 const deleteEmployee = async (req, res) => {
     const existing = await (0, db_1.queryOne)('SELECT id FROM employees WHERE id = ?', [req.params.id]);
     if (!existing) {
         res.status(404).json({ error: 'Employee not found' });
         return;
     }
-    await (0, db_1.execute)('DELETE FROM employees WHERE id = ?', [req.params.id]);
+    await (0, db_1.execute)('UPDATE employees SET is_active = false, updated_at = NOW() WHERE id = ?', [req.params.id]);
     res.json({ message: 'Employee deleted successfully' });
 };
 exports.deleteEmployee = deleteEmployee;

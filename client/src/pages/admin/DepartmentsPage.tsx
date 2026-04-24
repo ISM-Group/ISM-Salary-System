@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 export function DepartmentsPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data, refetch } = useQuery({
     queryKey: ['departments-admin'],
@@ -19,9 +20,26 @@ export function DepartmentsPage() {
     },
   });
 
+  const startEdit = (dept: any) => {
+    setEditingId(dept.id);
+    setName(dept.name);
+    setDescription(dept.description || '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setName('');
+    setDescription('');
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    await departmentsAPI.create({ name, description });
+    if (editingId) {
+      await departmentsAPI.update(editingId, { name, description });
+      setEditingId(null);
+    } else {
+      await departmentsAPI.create({ name, description });
+    }
     setName('');
     setDescription('');
     await refetch();
@@ -32,7 +50,7 @@ export function DepartmentsPage() {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Create Department</CardTitle>
+            <CardTitle>{editingId ? 'Edit Department' : 'Create Department'}</CardTitle>
           </CardHeader>
           <CardContent>
             <form className="grid gap-4 md:grid-cols-3" onSubmit={submit}>
@@ -42,7 +60,14 @@ export function DepartmentsPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Description"
               />
-              <Button type="submit">Add Department</Button>
+              <div className="flex gap-2">
+                <Button type="submit">{editingId ? 'Save Changes' : 'Add Department'}</Button>
+                {editingId && (
+                  <Button type="button" variant="outline" onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
             </form>
           </CardContent>
         </Card>
@@ -57,7 +82,7 @@ export function DepartmentsPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="w-32">Action</TableHead>
+                  <TableHead className="w-40">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -66,19 +91,29 @@ export function DepartmentsPage() {
                     <TableCell>{row.name}</TableCell>
                     <TableCell>{row.description || '-'}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          if (!window.confirm(`Delete ${row.name}?`)) {
-                            return;
-                          }
-                          await departmentsAPI.delete(row.id);
-                          await refetch();
-                        }}
-                      >
-                        Delete
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEdit(row)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            if (!window.confirm(`Delete ${row.name}?`)) {
+                              return;
+                            }
+                            await departmentsAPI.delete(row.id);
+                            if (editingId === row.id) cancelEdit();
+                            await refetch();
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

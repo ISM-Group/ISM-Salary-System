@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateAdvanceSalaryStatus = exports.createAdvanceSalary = exports.getEmployeeAdvanceSalaries = exports.getAdvanceSalaries = void 0;
 const db_1 = require("../utils/db");
 const auditLog_1 = require("../utils/auditLog");
+const fileStorage_1 = require("../utils/fileStorage");
 /**
  * Retrieves all advance salary records with optional filtering.
  * Returns the status field so that the daily salary release system
@@ -83,7 +84,9 @@ const createAdvanceSalary = async (req, res) => {
     const validStatuses = ['PENDING', 'APPROVED', 'REJECTED'];
     const advanceStatus = status && validStatuses.includes(status) ? status : 'APPROVED';
     const id = (0, db_1.generateId)();
-    const slipPhotoUrl = req.file ? `uploads/${id}-${req.file.originalname}` : null;
+    // req.file.filename is set by multer disk storage after writing the file to disk.
+    // This replaces the old memory-storage approach where the file buffer was never persisted.
+    const slipPhotoUrl = req.file ? (0, fileStorage_1.getUploadUrl)(req.file.filename) : null;
     await (0, db_1.execute)(`INSERT INTO advance_salaries
      (id, employee_id, amount, advance_date, slip_photo_url, notes, status, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`, [id, employeeId, amount, advanceDate, slipPhotoUrl, notes || null, advanceStatus]);

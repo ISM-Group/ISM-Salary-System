@@ -66,7 +66,14 @@ export function SalaryHistoryPage() {
             <TableBody>
               {salaryRecords.map((row: any) => (
                 <TableRow key={row.id}>
-                  <TableCell>{row.employeeId}</TableCell>
+                  <TableCell>
+                    <div>
+                      <p className="font-medium">{row.employeeName || row.employeeId}</p>
+                      {row.employeeCode && (
+                        <p className="text-xs text-muted-foreground">{row.employeeCode}</p>
+                      )}
+                    </div>
+                  </TableCell>
                   <TableCell>{new Date(row.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(row.totalSalary)}</TableCell>
                   <TableCell>{row.status}</TableCell>

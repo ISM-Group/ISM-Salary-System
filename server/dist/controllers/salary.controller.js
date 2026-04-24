@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getSalaryHistory = exports.calculateSalary = void 0;
 const db_1 = require("../utils/db");
 const holidays_controller_1 = require("./holidays.controller");
+const pagination_1 = require("../utils/pagination");
 /**
  * Calculates the number of calendar days in a given month.
  *
@@ -40,7 +41,6 @@ async function getWorkingDaysInMonth(employeeId, month) {
 /**
  * Auto-calculates advance salary deductions for an employee in a given month.
  * Only APPROVED advances are included in the deduction total.
- * This enforces the business rule that PENDING/REJECTED advances are NOT deducted.
  *
  * @param employeeId - The employee ID
  * @param month - A date string (YYYY-MM-DD or YYYY-MM) representing the month
@@ -60,10 +60,6 @@ async function calculateAdvanceDeductions(employeeId, month) {
  * Combines two sources:
  * 1. MONTHLY repayment loans: sum of PENDING installments due in this month
  * 2. DAILY repayment loans: sum of loan_deduction from daily_salary_releases
- *    already generated for this month (these track actual daily deductions taken)
- *
- * This enforces the business rule that daily loan deductions only occur on
- * PRESENT days (since daily releases are only generated for PRESENT days).
  *
  * @param employeeId - The employee ID
  * @param month - A date string (YYYY-MM-DD or YYYY-MM) representing the month
@@ -85,11 +81,9 @@ async function calculateLoanDeductions(employeeId, month) {
         monthlyLoanDeductions = Number(monthlyRow?.total || 0);
     }
     catch {
-        // Graceful fallback if columns don't exist yet
         monthlyLoanDeductions = 0;
     }
     // 2. DAILY repayment loans: sum of daily loan deductions from released salary records this month
-    // These are the actual deductions that were applied on PRESENT days only
     let dailyLoanDeductions = 0;
     try {
         const dailyRow = await (0, db_1.queryOne)(`SELECT COALESCE(SUM(dsr.loan_deduction), 0) AS total
@@ -99,7 +93,6 @@ async function calculateLoanDeductions(employeeId, month) {
         dailyLoanDeductions = Number(dailyRow?.total || 0);
     }
     catch {
-        // Graceful fallback if table doesn't exist yet
         dailyLoanDeductions = 0;
     }
     const totalLoanDeductions = monthlyLoanDeductions + dailyLoanDeductions;
@@ -107,16 +100,6 @@ async function calculateLoanDeductions(employeeId, month) {
 }
 /**
  * Calculates salary for an employee for a given month.
- *
- * Supports two salary models:
- * - FIXED: base_salary - (daily_deduction_rate × absent_days) - loan_deductions - advance_deductions + bonus
- *   where daily_deduction_rate = base_salary / working_days_in_month (accounts for holidays)
- * - DAILY_WAGE: (daily_wage × calendar_days) - (daily_wage × absent_days) - loan_deductions - advance_deductions + bonus
- *   Holiday days where the employee is not marked absent are paid at full daily wage for PAID holidays.
- *
- * Deductions are auto-calculated from the database:
- * - Advance deductions: sum of APPROVED advance_salaries for the month
- * - Loan deductions: MONTHLY installments due + DAILY loan deductions from daily releases
  *
  * POST /api/salary/calculate
  * Body: { employeeId, month, bonus }
@@ -162,23 +145,18 @@ const calculateSalary = async (req, res) => {
     const baseSalary = Number(employee?.baseSalary || 0);
     const salaryType = employee?.salaryType || 'DAILY_WAGE';
     if (salaryType === 'FIXED') {
-        // Fixed salary: base_salary - absent deductions
         gross = baseSalary;
         const dailyDeductionRate = workingDays > 0 ? baseSalary / workingDays : 0;
         absentDeduction = Math.round(dailyDeductionRate * absentDays * 100) / 100;
     }
     else {
-        // Daily wage: daily_wage × calendar_days (paid holidays included as working days)
         gross = dailyWage * calendarDays;
         absentDeduction = dailyWage * absentDays;
     }
     // Auto-calculate deductions from the database
-    // Only APPROVED advances are deducted (enforcing approval workflow)
     const advanceDeductions = await calculateAdvanceDeductions(employeeId, month);
-    // Loan deductions: monthly installments + daily loan deductions from daily releases
-    // Daily loan deductions skip ABSENT days because daily releases only generate for PRESENT days
     const { monthlyLoanDeductions, dailyLoanDeductions, totalLoanDeductions } = await calculateLoanDeductions(employeeId, month);
-    // Calculate total salary — negative values are allowed per business rules
+    // Calculate total salary
     const total = gross -
         absentDeduction +
         Number(bonus || 0) -
@@ -211,37 +189,41 @@ const calculateSalary = async (req, res) => {
 };
 exports.calculateSalary = calculateSalary;
 /**
- * Retrieves salary calculation history, optionally filtered by employee and date range.
+ * Retrieves salary calculation history with server-side pagination.
  *
- * GET /api/salary/history?employeeId=X&from=YYYY-MM&to=YYYY-MM
+ * GET /api/salary/history?employeeId=X&from=YYYY-MM&to=YYYY-MM&page=&limit=
  * @param req - Express request with optional query filters
  * @param res - Express response with salary history records
  */
 // PUBLIC_INTERFACE
 const getSalaryHistory = async (req, res) => {
     const { employeeId, from, to } = req.query;
-    let sql = `
-    SELECT id, employee_id as employeeId, month, total_salary as totalSalary, status,
-           daily_wage_total as dailyWageTotal, bonus, advance_deductions as advanceDeductions,
-           loan_deductions as loanDeductions
-    FROM salary_calculations
-    WHERE 1=1
-  `;
+    const pagination = (0, pagination_1.parsePagination)(req.query);
+    const selectFields = `sc.id, sc.employee_id as employeeId, e.full_name as employeeName,
+           e.employee_id as employeeCode,
+           sc.month, sc.total_salary as totalSalary, sc.status,
+           sc.daily_wage_total as dailyWageTotal, sc.bonus,
+           sc.advance_deductions as advanceDeductions,
+           sc.loan_deductions as loanDeductions`;
+    const fromClause = `FROM salary_calculations sc LEFT JOIN employees e ON e.id = sc.employee_id`;
+    let whereClause = 'WHERE 1=1';
     const params = [];
     if (employeeId) {
-        sql += ' AND employee_id = ?';
+        whereClause += ' AND sc.employee_id = ?';
         params.push(employeeId);
     }
     if (from) {
-        sql += ' AND month >= ?';
+        whereClause += ' AND sc.month >= ?';
         params.push(from);
     }
     if (to) {
-        sql += ' AND month <= ?';
+        whereClause += ' AND sc.month <= ?';
         params.push(to);
     }
-    sql += ' ORDER BY month DESC';
-    const rows = await (0, db_1.query)(sql, params);
+    const countResult = await (0, db_1.queryOne)(`SELECT COUNT(*) AS total ${fromClause} ${whereClause}`, params);
+    const total = Number(countResult?.total || 0);
+    const dataSql = `SELECT ${selectFields} ${fromClause} ${whereClause} ORDER BY sc.month DESC LIMIT ? OFFSET ?`;
+    const rows = await (0, db_1.query)(dataSql, [...params, pagination.limit, pagination.offset]);
     res.json({
         data: rows.map((r) => ({
             ...r,
@@ -251,6 +233,7 @@ const getSalaryHistory = async (req, res) => {
             advanceDeductions: Number(r.advanceDeductions || 0),
             loanDeductions: Number(r.loanDeductions || 0),
         })),
+        pagination: (0, pagination_1.buildPaginationMeta)(total, pagination),
     });
 };
 exports.getSalaryHistory = getSalaryHistory;

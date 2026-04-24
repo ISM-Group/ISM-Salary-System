@@ -12,6 +12,7 @@ export function RolesPage() {
   const [name, setName] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [dailyWage, setDailyWage] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const { data: departmentsData } = useQuery({
     queryKey: ['departments-for-roles'],
@@ -28,13 +29,33 @@ export function RolesPage() {
     },
   });
 
+  const startEdit = (role: any) => {
+    setEditingId(role.id);
+    setName(role.name);
+    setDepartmentId(role.departmentId || role.department?.id || '');
+    setDailyWage(role.dailyWage != null ? String(role.dailyWage) : '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setName('');
+    setDepartmentId('');
+    setDailyWage('');
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    await rolesAPI.create({
+    const payload = {
       name,
       departmentId,
       dailyWage: dailyWage ? Number(dailyWage) : null,
-    });
+    };
+    if (editingId) {
+      await rolesAPI.update(editingId, payload);
+      setEditingId(null);
+    } else {
+      await rolesAPI.create(payload);
+    }
     setName('');
     setDepartmentId('');
     setDailyWage('');
@@ -46,7 +67,7 @@ export function RolesPage() {
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Create Role</CardTitle>
+            <CardTitle>{editingId ? 'Edit Role' : 'Create Role'}</CardTitle>
           </CardHeader>
           <CardContent>
             <form className="grid gap-4 md:grid-cols-4" onSubmit={submit}>
@@ -70,7 +91,14 @@ export function RolesPage() {
                 value={dailyWage}
                 onChange={(e) => setDailyWage(e.target.value)}
               />
-              <Button type="submit">Add Role</Button>
+              <div className="flex gap-2">
+                <Button type="submit">{editingId ? 'Save Changes' : 'Add Role'}</Button>
+                {editingId && (
+                  <Button type="button" variant="outline" onClick={cancelEdit}>
+                    Cancel
+                  </Button>
+                )}
+              </div>
             </form>
           </CardContent>
         </Card>
@@ -86,7 +114,7 @@ export function RolesPage() {
                   <TableHead>Role</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Daily Wage</TableHead>
-                  <TableHead className="w-32">Action</TableHead>
+                  <TableHead className="w-40">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -96,19 +124,29 @@ export function RolesPage() {
                     <TableCell>{r.department?.name || '-'}</TableCell>
                     <TableCell>{r.dailyWage ? formatCurrency(r.dailyWage) : '-'}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          if (!window.confirm(`Delete ${r.name}?`)) {
-                            return;
-                          }
-                          await rolesAPI.delete(r.id);
-                          await refetch();
-                        }}
-                      >
-                        Delete
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => startEdit(r)}
+                        >
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            if (!window.confirm(`Delete ${r.name}?`)) {
+                              return;
+                            }
+                            await rolesAPI.delete(r.id);
+                            if (editingId === r.id) cancelEdit();
+                            await refetch();
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

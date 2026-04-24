@@ -316,11 +316,11 @@ SET FOREIGN_KEY_CHECKS = 1;
 -- Seed: System Users
 -- ─────────────────────────────────────────────────────
 -- Password for all users: "password"
--- bcrypt hash: $2b$10$CwTycUXWue0Thq9StjUM0uJ8rQ5M8r.EzY4xXHzkwmo7aX6ixkmK.
+-- bcrypt hash: $2b$10$Lsno0FoBRGQa/e5bbCvwu.lr9iu9lQqTzXKqzh5u8NulNr5RoNBY2
 INSERT INTO users (id, username, password_hash, full_name, role, is_active) VALUES
-('user-admin-001', 'admin', '$2b$10$CwTycUXWue0Thq9StjUM0uJ8rQ5M8r.EzY4xXHzkwmo7aX6ixkmK.', 'Nimal Perera', 'ADMIN', TRUE),
-('user-hr-001', 'hrmanager', '$2b$10$CwTycUXWue0Thq9StjUM0uJ8rQ5M8r.EzY4xXHzkwmo7aX6ixkmK.', 'Sanduni Jayasinghe', 'ADMIN', TRUE),
-('user-mgr-001', 'manager1', '$2b$10$CwTycUXWue0Thq9StjUM0uJ8rQ5M8r.EzY4xXHzkwmo7aX6ixkmK.', 'Kasun Fernando', 'MANAGER', TRUE);
+('user-admin-001', 'admin', '$2b$10$Lsno0FoBRGQa/e5bbCvwu.lr9iu9lQqTzXKqzh5u8NulNr5RoNBY2', 'Nimal Perera', 'ADMIN', TRUE),
+('user-hr-001', 'hrmanager', '$2b$10$Lsno0FoBRGQa/e5bbCvwu.lr9iu9lQqTzXKqzh5u8NulNr5RoNBY2', 'Sanduni Jayasinghe', 'ADMIN', TRUE),
+('user-mgr-001', 'manager1', '$2b$10$Lsno0FoBRGQa/e5bbCvwu.lr9iu9lQqTzXKqzh5u8NulNr5RoNBY2', 'Kasun Fernando', 'MANAGER', TRUE);
 
 -- ─────────────────────────────────────────────────────
 -- Seed: Departments

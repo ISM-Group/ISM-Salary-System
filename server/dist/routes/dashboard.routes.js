@@ -3,14 +3,18 @@ Object.defineProperty(exports, "__esModule", { value: true });
 /**
  * Dashboard Routes
  *
- * Provides dashboard statistics and analytics.
- * All endpoints require authentication. Both ADMIN and MANAGER can access.
+ * Provides aggregated statistics and analytics data.
+ * - GET /stats                      — Get overview statistics
+ * - GET /salary-trends              — Get salary trends over months
+ * - GET /department-distribution    — Get employee count by department
+ * - GET /attendance-stats           — Get attendance statistics
+ * - GET /loan-breakdown             — Get loan breakdown by status
+ * - GET /recent-activity            — Get recent audit log activity
  */
 const express_1 = require("express");
 const dashboard_controller_1 = require("../controllers/dashboard.controller");
 const auth_middleware_1 = require("../middleware/auth.middleware");
 const router = (0, express_1.Router)();
-// All routes require authentication — both ADMIN and MANAGER can view
 router.use(auth_middleware_1.authenticate);
 router.get('/stats', dashboard_controller_1.getStats);
 router.get('/salary-trends', dashboard_controller_1.getSalaryTrends);
