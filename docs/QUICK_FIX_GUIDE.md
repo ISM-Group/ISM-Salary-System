@@ -133,7 +133,7 @@ DATABASE_PASSWORD=
 DATABASE_NAME=ism_salary
 
 # Server Configuration
-PORT=5001
+PORT=5002
 NODE_ENV=development
 
 # JWT Configuration
@@ -176,7 +176,7 @@ import app from './app';
 // Load environment variables
 dotenv.config();
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5002;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
 const server = http.createServer(app);
@@ -332,7 +332,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:5001',
+        target: 'http://localhost:5002',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '/api'),
       },
@@ -354,7 +354,7 @@ export default defineConfig({
 
 ```env
 # API Configuration
-VITE_API_URL=http://localhost:5001/api
+VITE_API_URL=http://localhost:5002/api
 VITE_APP_NAME=ISM Salary System
 
 # Build Configuration
@@ -421,7 +421,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 **File**: `/client/.env.local`
 
 ```env
-VITE_API_URL=http://localhost:5001/api
+VITE_API_URL=http://localhost:5002/api
 ```
 
 ---
@@ -436,7 +436,7 @@ DATABASE_PORT=3306
 DATABASE_USER=root
 DATABASE_PASSWORD=
 DATABASE_NAME=ism_salary
-PORT=5001
+PORT=5002
 NODE_ENV=development
 JWT_SECRET=dev_secret_key
 JWT_REFRESH_SECRET=dev_refresh_secret
@@ -470,7 +470,7 @@ mysql -u root < server/UPDATE_TO_DAILY_WAGE.sql
 ```bash
 cd server
 npm run dev
-# Server running on http://localhost:5001
+# Server running on http://localhost:5002
 ```
 
 ### 5. Start Client (in new terminal)

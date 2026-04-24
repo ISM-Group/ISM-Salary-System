@@ -4,7 +4,7 @@ import app from './app';
 
 dotenv.config();
 
-const port = Number(process.env.PORT || 5001);
+const port = Number(process.env.PORT || 5002);
 const server = http.createServer(app);
 
 server.listen(port, () => {

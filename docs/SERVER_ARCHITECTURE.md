@@ -5,7 +5,7 @@
 The server is a Node.js/Express REST API built with TypeScript for the ISM Salary Management System. It provides JWT-based authentication, role-based access control (RBAC), Zod input validation, audit logging, and connects to a MySQL 8+ database via connection pooling. The server implements 13 API route modules covering all salary management operations.
 
 **Build status**: ✅ Builds and runs successfully  
-**Dev server**: `npm run dev` (nodemon + ts-node) on port 5001  
+**Dev server**: `npm run dev` (nodemon + ts-node) on port 5002  
 **Production build**: `npm run build` compiles to `dist/`; `npm start` runs the compiled JS
 
 ---
@@ -85,7 +85,7 @@ server/
 
 ### server.ts
 
-Creates an HTTP server that listens on the port specified by the `PORT` environment variable (default: 5001). The server is a thin wrapper around the Express `app` module.
+Creates an HTTP server that listens on the port specified by the `PORT` environment variable (default: 5002). The server is a thin wrapper around the Express `app` module.
 
 ### app.ts — Middleware Stack
 
@@ -312,7 +312,7 @@ DATABASE_PASSWORD=
 DATABASE_NAME=ism_salary
 
 # Server
-PORT=5001
+PORT=5002
 NODE_ENV=development
 
 # JWT

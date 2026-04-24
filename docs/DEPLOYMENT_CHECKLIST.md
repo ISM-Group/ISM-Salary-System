@@ -111,7 +111,7 @@ DATABASE_USER=mrfawz_user
 DATABASE_PASSWORD=YOUR_PRODUCTION_PASSWORD
 DATABASE_NAME=ISM_salary
 
-PORT=5001
+PORT=5002
 NODE_ENV=production
 CLIENT_URL=https://salary.ismgroups.lk
 
@@ -124,7 +124,7 @@ EOF
 chmod 600 /home/deploy/ism-server/.env
 ```
 
-**Note:** `CLIENT_URL` points to the client subdomain (`salary.ismgroups.lk`). The server runs on `localhost:5001` and is proxied by Nginx from `api.salary.ismgroups.lk`.
+**Note:** `CLIENT_URL` points to the client subdomain (`salary.ismgroups.lk`). The server runs on `localhost:5002` and is proxied by Nginx from `api.salary.ismgroups.lk`.
 
 ---
 
@@ -190,7 +190,7 @@ server {
 
     # All traffic to backend
     location / {
-        proxy_pass http://localhost:5001;
+        proxy_pass http://localhost:5002;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -371,7 +371,7 @@ git push origin main                # Triggers GitHub Actions
 | 502 Bad Gateway on api subdomain | SSH to VPS, run `pm2 status` and `pm2 logs ism-server` |
 | SSL not working | Run `sudo certbot certonly --nginx -d salary.ismgroups.lk` AND `sudo certbot certonly --nginx -d api.salary.ismgroups.lk` |
 | Client page returns 404 | Check files in `/var/www/ism-client`, run client workflow |
-| API fails to respond | Check Nginx proxy config, verify backend runs on `localhost:5001` |
+| API fails to respond | Check Nginx proxy config, verify backend runs on `localhost:5002` |
 | GitHub Actions fails | Check Secret values, verify SSH key permissions (600), check action logs |
 
 ---

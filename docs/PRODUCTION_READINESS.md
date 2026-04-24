@@ -32,7 +32,7 @@ The ISM-Salary-System (Client + Server) is in a **pre-alpha state** with signifi
 │                                                                   │
 │  ┌──────────────────┐         ┌──────────────────┐             │
 │  │   React Frontend  │         │   Express Server │             │
-│  │   (Port 3000)    │◄───────►│   (Port 5001)   │             │
+│  │   (Port 3000)    │◄───────►│   (Port 5002)   │             │
 │  │                  │  HTTP   │                  │             │
 │  │ • Dashboard      │  REST   │ • Auth           │             │
 │  │ • Employees      │  API    │ • Employees      │             │
@@ -222,14 +222,14 @@ DATABASE_PASSWORD=xxx
 DATABASE_NAME=ism_salary
 JWT_SECRET=your_secret_key
 JWT_REFRESH_SECRET=refresh_secret
-PORT=5001
+PORT=5002
 NODE_ENV=development
 CLIENT_URL=http://localhost:3000
 ```
 
 **Client**:
 ```env
-VITE_API_URL=http://localhost:5001/api
+VITE_API_URL=http://localhost:5002/api
 VITE_PRODUCTION_URL=https://api.production.example.com/api
 ```
 

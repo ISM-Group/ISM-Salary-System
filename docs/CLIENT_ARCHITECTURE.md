@@ -151,7 +151,7 @@ ADMIN and MANAGER users are routed to `/admin/dashboard` on login. Other users a
 
 The API client (`src/lib/api.ts`) creates a centralized Axios instance configured with:
 
-- **Base URL**: `VITE_API_URL` environment variable (default: `http://localhost:5001/api`)
+- **Base URL**: `VITE_API_URL` environment variable (default: `http://localhost:5002/api`)
 - **Request interceptor**: Auto-attaches `Bearer <token>` from localStorage
 - **Response interceptor**: On 401 errors (when not on the login page), clears auth state and redirects to `/login`
 - **Credentials**: `withCredentials: true` for CORS cookie support
@@ -232,10 +232,10 @@ Sidebar-specific tokens provide a distinct dark theme for the navigation. Custom
 The client uses Vite environment variables (prefixed with `VITE_`):
 
 ```env
-VITE_API_URL=http://localhost:5001/api
+VITE_API_URL=http://localhost:5002/api
 ```
 
-If `VITE_API_URL` is not set, the API client defaults to `http://localhost:5001/api`.
+If `VITE_API_URL` is not set, the API client defaults to `http://localhost:5002/api`.
 
 ---
 

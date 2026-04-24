@@ -24,7 +24,7 @@
 
 ### Implemented and Functional ✅
 
-- Express server starts on port 5001 with full middleware stack (Helmet, rate limiting, CORS, logging)
+- Express server starts on port 5002 with full middleware stack (Helmet, rate limiting, CORS, logging)
 - React client starts on port 3000 with Vite hot-reloading
 - JWT-based authentication with bcrypt password hashing
 - Role-based access control (ADMIN and MANAGER roles) aligned across app code and database schema
@@ -57,7 +57,7 @@
 The system is a standard 3-tier web application:
 
 ```
-React SPA (port 3000)  ──HTTP REST──►  Express API (port 5001)  ──MySQL──►  MySQL 8+ DB
+React SPA (port 3000)  ──HTTP REST──►  Express API (port 5002)  ──MySQL──►  MySQL 8+ DB
 ```
 
 - **Client**: React 18 + Vite + TypeScript + Tailwind CSS + TanStack Query

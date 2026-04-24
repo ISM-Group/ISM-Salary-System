@@ -13,7 +13,7 @@ The ISM Salary Management System is a full-stack web application for daily-wage 
 The system consists of two primary components:
 
 - **Client** (`client/`): A React 18 single-page application built with Vite, TypeScript, Tailwind CSS, and TanStack Query. Runs on port 3000.
-- **Server** (`server/`): An Express.js REST API built with TypeScript, connecting to MySQL 8+ via `mysql2`. Runs on port 5001.
+- **Server** (`server/`): An Express.js REST API built with TypeScript, connecting to MySQL 8+ via `mysql2`. Runs on port 5002.
 
 Both components build successfully and can be run locally with the commands below.
 
@@ -33,7 +33,7 @@ Both components build successfully and can be run locally with the commands belo
 cd server
 cp .env.example .env        # edit database credentials and JWT secret
 npm install
-npm run dev                  # starts on http://localhost:5001
+npm run dev                  # starts on http://localhost:5002
 ```
 
 ### Client
@@ -127,7 +127,7 @@ The current codebase is a functional MVP. Before production deployment, complete
 │                                                              │
 │  ┌──────────────────┐         ┌──────────────────┐          │
 │  │   React Client   │◄───────►│  Express Server  │          │
-│  │   (Port 3000)    │  HTTP   │   (Port 5001)    │          │
+│  │   (Port 3000)    │  HTTP   │   (Port 5002)    │          │
 │  │                  │  REST   │                  │          │
 │  │ • Vite + TS      │  API    │ • JWT Auth       │          │
 │  │ • Tailwind CSS   │         │ • Zod Validation │          │

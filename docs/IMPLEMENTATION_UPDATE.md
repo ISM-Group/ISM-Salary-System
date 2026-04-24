@@ -15,7 +15,7 @@ The Express/TypeScript backend at `server/` is substantially complete as a funct
 
 - `server/package.json` — All production and dev dependencies, including Zod for validation
 - `server/tsconfig.json` — TypeScript compilation targeting ES2020 with strict mode
-- `server/src/server.ts` — HTTP server entry point on configurable port (default 5001)
+- `server/src/server.ts` — HTTP server entry point on configurable port (default 5002)
 - `server/src/app.ts` — Express app with full middleware stack
 
 **Middleware Stack**

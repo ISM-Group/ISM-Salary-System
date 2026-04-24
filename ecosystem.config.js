@@ -8,7 +8,7 @@ module.exports = {
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        PORT: 5001,
+        PORT: 5002,
       },
       error_file: '/home/deploy/ism-server/logs/error.log',
       out_file: '/home/deploy/ism-server/logs/out.log',

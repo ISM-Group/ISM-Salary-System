@@ -56,7 +56,7 @@ env:
 
 Two subdomains:
 - `salary.ismgroups.lk` → Client (React app on Nginx)
-- `api.salary.ismgroups.lk` → API (Node.js backend on localhost:5001)
+- `api.salary.ismgroups.lk` → API (Node.js backend on localhost:5002)
 
 ### Step 1: Get your VPS IP address
 
@@ -141,7 +141,7 @@ DATABASE_USER=mrfawz_user
 DATABASE_PASSWORD=YOUR_PROD_PASSWORD    # Use a strong password in production
 DATABASE_NAME=ISM_salary
 
-PORT=5001
+PORT=5002
 NODE_ENV=production
 CLIENT_URL=https://salary.ismgroups.lk  # Use https in production
 
@@ -234,7 +234,7 @@ server {
 
     # API proxy to backend (all traffic goes to Node.js)
     location / {
-        proxy_pass http://localhost:5001;
+        proxy_pass http://localhost:5002;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -403,7 +403,7 @@ cat ~/.ssh/id_rsa_deploy
 
 4. Nginx serves:
    - `/` → client static files
-   - `/api/*` → proxies to backend on `localhost:5001`
+   - `/api/*` → proxies to backend on `localhost:5002`
 
 ---
 
@@ -449,7 +449,7 @@ sudo journalctl -xe
 |-------|----------|
 | DNS not resolving | Wait 30 min, check registrar settings, verify A record points to correct IP |
 | SSL cert error | Run `sudo certbot renew --dry-run`, check `/var/log/letsencrypt/letsencrypt.log` |
-| 502 Bad Gateway | Check `pm2 status`, verify backend running on `localhost:5001`, check PM2 logs |
+| 502 Bad Gateway | Check `pm2 status`, verify backend running on `localhost:5002`, check PM2 logs |
 | Permission denied on rsync | Verify deploy user owns `/var/www/ism-client` and `/home/deploy/ism-server` |
 | GitHub Actions fails | Check Action logs in repo → Actions tab, verify secrets are set, check SSH key perms (600) |
 | Client not loading | Check Nginx config, verify `client/dist/` files exist, check browser console |
