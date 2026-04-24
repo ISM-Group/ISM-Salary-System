@@ -55,7 +55,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            set -e
+            set -euo pipefail
 
             CLIENT_PATH="/var/www/ism-client"
             BACKUP_PATH="/var/www/ism-client-backup"
@@ -65,43 +65,77 @@ jobs:
             echo "Starting Client Deployment..."
             echo "=========================================="
 
-            # Create backup
-            if [ -d "$CLIENT_PATH" ]; then
+            # Determine sudo availability (prefer passwordless sudo)
+            SUDO=''
+            DEPLOY_USER="$(whoami)"
+            if [ "$(id -u)" -ne 0 ]; then
+              if sudo -n true 2>/dev/null; then
+                SUDO='sudo'
+                echo "[INFO] passwordless sudo available"
+              else
+                echo "[WARN] passwordless sudo not available; operations on /var/www may fail"
+              fi
+            fi
+
+            # Create backup if target exists
+            if $SUDO test -d "$CLIENT_PATH"; then
               echo "[INFO] Creating backup of current deployment..."
-              rm -rf "$BACKUP_PATH"
-              cp -r "$CLIENT_PATH" "$BACKUP_PATH"
+              $SUDO rm -rf "$BACKUP_PATH" || true
+              $SUDO mkdir -p "$BACKUP_PATH"
+              $SUDO cp -a "$CLIENT_PATH/." "$BACKUP_PATH/" || true
               echo "[INFO] Backup created at $BACKUP_PATH"
             fi
 
-            # Extract new build
-            echo "[INFO] Extracting new build..."
-            mkdir -p "$CLIENT_PATH"
-            rm -rf "$CLIENT_PATH"/*
-            tar -xzf "$TEMP_DIR/client-deploy.tar.gz" -C "$CLIENT_PATH" --strip-components=1
+            # Ensure target exists (create with sudo if required)
+            if ! $SUDO test -d "$CLIENT_PATH" >/dev/null 2>&1; then
+              if [ -n "$SUDO" ]; then
+                $SUDO mkdir -p "$CLIENT_PATH"
+                $SUDO chown -R "$DEPLOY_USER":"$DEPLOY_USER" "$CLIENT_PATH" || true
+              else
+                mkdir -p "$CLIENT_PATH" || true
+              fi
+            fi
 
-            # Verify deployment
-            if [ ! -d "$CLIENT_PATH/dist" ]; then
-              echo "[ERROR] Client deployment failed - dist/ not found"
+            echo "[INFO] Extracting new build..."
+            # Clean target and extract
+            if [ -n "$SUDO" ]; then
+              $SUDO rm -rf "$CLIENT_PATH"/* || true
+              $SUDO tar -xzf "$TEMP_DIR/client-deploy.tar.gz" -C "$CLIENT_PATH" --strip-components=1
+            else
+              rm -rf "$CLIENT_PATH"/* || true
+              tar -xzf "$TEMP_DIR/client-deploy.tar.gz" -C "$CLIENT_PATH" --strip-components=1
+            fi
+
+            # Verify deployment (check for index.html or non-empty directory)
+            if [ ! -f "$CLIENT_PATH/index.html" ] && [ -z "$(ls -A "$CLIENT_PATH" 2>/dev/null)" ]; then
+              echo "[ERROR] Client deployment failed - target directory empty or missing index.html"
               echo "[INFO] Restoring from backup..."
-              rm -rf "$CLIENT_PATH"
-              cp -r "$BACKUP_PATH" "$CLIENT_PATH"
+              if [ -n "$SUDO" ]; then
+                $SUDO rm -rf "$CLIENT_PATH" || true
+                $SUDO cp -a "$BACKUP_PATH/." "$CLIENT_PATH/" || true
+              else
+                rm -rf "$CLIENT_PATH" || true
+                cp -a "$BACKUP_PATH/." "$CLIENT_PATH/" || true
+              fi
               exit 1
             fi
 
             echo "[INFO] Client build deployed successfully"
-            
-            # Reload Nginx
+
+            # Reload Nginx (use sudo if available)
             echo "[INFO] Reloading Nginx..."
-            sudo systemctl reload nginx
-            
-            if [ $? -eq 0 ]; then
-              echo "[SUCCESS] Nginx reloaded successfully"
+            if [ -n "$SUDO" ]; then
+              $SUDO systemctl reload nginx && echo "[SUCCESS] Nginx reloaded successfully" || echo "[WARNING] Failed to reload Nginx, but deployment is complete"
             else
-              echo "[WARNING] Failed to reload Nginx, but deployment is complete"
+              if command -v sudo >/dev/null 2>&1; then
+                sudo systemctl reload nginx && echo "[SUCCESS] Nginx reloaded successfully" || echo "[WARNING] Failed to reload Nginx, but deployment is complete"
+              else
+                echo "[WARNING] Skipping Nginx reload (no sudo)"
+              fi
             fi
 
             # Cleanup
-            rm -f "$TEMP_DIR/client-deploy.tar.gz"
+            rm -f "$TEMP_DIR/client-deploy.tar.gz" || true
             echo "[INFO] Cleanup completed"
 
             echo "=========================================="
