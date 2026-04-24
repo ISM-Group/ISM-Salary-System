@@ -55,7 +55,7 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            set -e
+            set -euo pipefail
 
             SERVER_PATH="/home/deploy/ism-server"
             BACKUP_PATH="/home/deploy/ism-server-backup"
@@ -66,29 +66,59 @@ jobs:
             echo "Starting Server Deployment..."
             echo "=========================================="
 
-            # Create backup
-            if [ -d "$SERVER_PATH/dist" ]; then
+            # Determine sudo availability (prefer passwordless sudo)
+            SUDO=''
+            DEPLOY_USER="$(whoami)"
+            if [ "$(id -u)" -ne 0 ]; then
+              if sudo -n true 2>/dev/null; then
+                SUDO='sudo'
+                echo "[INFO] passwordless sudo available"
+              else
+                echo "[WARN] passwordless sudo not available; operations on $SERVER_PATH may fail"
+              fi
+            fi
+
+            # Create backup if target exists
+            if $SUDO test -d "$SERVER_PATH/dist" >/dev/null 2>&1; then
               echo "[INFO] Creating backup of current deployment..."
-              rm -rf "$BACKUP_PATH"
-              mkdir -p "$BACKUP_PATH"
-              cp -r "$SERVER_PATH/dist" "$BACKUP_PATH/"
-              cp -r "$SERVER_PATH/node_modules" "$BACKUP_PATH/" 2>/dev/null || true
+              $SUDO rm -rf "$BACKUP_PATH" || true
+              $SUDO mkdir -p "$BACKUP_PATH"
+              $SUDO cp -a "$SERVER_PATH/dist" "$BACKUP_PATH/" || true
+              $SUDO cp -a "$SERVER_PATH/node_modules" "$BACKUP_PATH/" 2>/dev/null || true
               echo "[INFO] Backup created at $BACKUP_PATH"
             fi
 
-            # Extract new build
-            echo "[INFO] Extracting new build..."
-            mkdir -p "$SERVER_PATH"
-            tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$SERVER_PATH" --strip-components=1
+            # Ensure target exists
+            if ! $SUDO test -d "$SERVER_PATH" >/dev/null 2>&1; then
+              if [ -n "$SUDO" ]; then
+                $SUDO mkdir -p "$SERVER_PATH"
+                $SUDO chown -R "$DEPLOY_USER":"$DEPLOY_USER" "$SERVER_PATH" || true
+              else
+                mkdir -p "$SERVER_PATH" || true
+              fi
+            fi
 
-            # Verify build
-            if [ ! -d "$SERVER_PATH/dist" ]; then
-              echo "[ERROR] Server deployment failed - dist/ not found"
+            echo "[INFO] Extracting new build..."
+            # Clean target and extract
+            if [ -n "$SUDO" ]; then
+              $SUDO rm -rf "$SERVER_PATH"/dist "$SERVER_PATH"/package.json || true
+              $SUDO tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$SERVER_PATH" --strip-components=1
+            else
+              rm -rf "$SERVER_PATH"/dist "$SERVER_PATH"/package.json || true
+              tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$SERVER_PATH" --strip-components=1
+            fi
+
+            # Verify build (check for server.js entry point)
+            if [ ! -f "$SERVER_PATH/dist/server.js" ]; then
+              echo "[ERROR] Server deployment failed - dist/server.js not found"
               echo "[INFO] Restoring from backup..."
-              rm -rf "$SERVER_PATH/dist"
-              rm -rf "$SERVER_PATH/node_modules"
-              cp -r "$BACKUP_PATH/dist" "$SERVER_PATH/"
-              cp -r "$BACKUP_PATH/node_modules" "$SERVER_PATH/" 2>/dev/null || true
+              if [ -n "$SUDO" ]; then
+                $SUDO rm -rf "$SERVER_PATH"/dist || true
+                $SUDO cp -a "$BACKUP_PATH/dist" "$SERVER_PATH/" || true
+              else
+                rm -rf "$SERVER_PATH"/dist || true
+                cp -a "$BACKUP_PATH/dist" "$SERVER_PATH/" || true
+              fi
               exit 1
             fi
 
@@ -121,7 +151,7 @@ jobs:
             pm2 info "$PM2_NAME"
 
             # Cleanup
-            rm -f "$TEMP_DIR/server-deploy.tar.gz"
+            rm -f "$TEMP_DIR/server-deploy.tar.gz" || true
             echo "[INFO] Cleanup completed"
 
             echo "=========================================="
