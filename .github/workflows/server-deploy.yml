@@ -56,9 +56,17 @@ jobs:
             set -euo pipefail
 
             SERVER_PATH="/home/deploy/ism-server"
-            BACKUP_PATH="/home/deploy/ism-server-backup"
             TEMP_DIR="/tmp"
+            RELEASE_DIR="$TEMP_DIR/ism-server-release"
+            BACKUP_PATH="$TEMP_DIR/ism-server-backup"
             PM2_NAME="ism-server"
+            DEPLOY_USER="$(whoami)"
+
+            cleanup() {
+              rm -rf "$RELEASE_DIR" "$BACKUP_PATH"
+              rm -f "$TEMP_DIR/server-deploy.tar.gz"
+            }
+            trap cleanup EXIT
 
             echo "=========================================="
             echo "Starting Server Deployment..."
@@ -66,56 +74,72 @@ jobs:
 
             # Determine sudo availability (prefer passwordless sudo)
             SUDO=''
-            DEPLOY_USER="$(whoami)"
             if [ "$(id -u)" -ne 0 ]; then
               if sudo -n true 2>/dev/null; then
                 SUDO='sudo'
                 echo "[INFO] passwordless sudo available"
               else
-                echo "[WARN] passwordless sudo not available; operations on $SERVER_PATH may fail"
+                echo "[WARN] passwordless sudo not available"
+              fi
+            fi
+
+            echo "[INFO] Preparing release files in $RELEASE_DIR"
+            rm -rf "$RELEASE_DIR" "$BACKUP_PATH"
+            mkdir -p "$RELEASE_DIR" "$BACKUP_PATH"
+            tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$RELEASE_DIR" --strip-components=1
+
+            if [ ! -f "$RELEASE_DIR/dist/server.js" ]; then
+              echo "[ERROR] Release package is invalid - dist/server.js not found"
+              exit 1
+            fi
+
+            # Ensure target exists and is writable before touching current deployment
+            if [ -n "$SUDO" ]; then
+              $SUDO mkdir -p "$SERVER_PATH"
+              $SUDO chown -R "$DEPLOY_USER":"$DEPLOY_USER" "$SERVER_PATH" || true
+            else
+              mkdir -p "$SERVER_PATH"
+              if [ ! -w "$SERVER_PATH" ]; then
+                echo "[ERROR] $SERVER_PATH is not writable by user $DEPLOY_USER"
+                echo "[ERROR] Fix on the VPS once with:"
+                echo "sudo chown -R $DEPLOY_USER:$DEPLOY_USER $SERVER_PATH"
+                exit 1
               fi
             fi
 
             # Create backup if target exists
-            if $SUDO test -d "$SERVER_PATH/dist" >/dev/null 2>&1; then
+            if [ -d "$SERVER_PATH/dist" ]; then
               echo "[INFO] Creating backup of current deployment..."
-              $SUDO rm -rf "$BACKUP_PATH" || true
-              $SUDO mkdir -p "$BACKUP_PATH"
-              $SUDO cp -a "$SERVER_PATH/dist" "$BACKUP_PATH/" || true
-              $SUDO cp -a "$SERVER_PATH/node_modules" "$BACKUP_PATH/" 2>/dev/null || true
+              cp -a "$SERVER_PATH/dist" "$BACKUP_PATH/" || true
+              cp -a "$SERVER_PATH/node_modules" "$BACKUP_PATH/" 2>/dev/null || true
               echo "[INFO] Backup created at $BACKUP_PATH"
             fi
 
-            # Ensure target exists
-            if ! $SUDO test -d "$SERVER_PATH" >/dev/null 2>&1; then
-              if [ -n "$SUDO" ]; then
-                $SUDO mkdir -p "$SERVER_PATH"
-                $SUDO chown -R "$DEPLOY_USER":"$DEPLOY_USER" "$SERVER_PATH" || true
-              else
-                mkdir -p "$SERVER_PATH" || true
-              fi
-            fi
-
-            echo "[INFO] Extracting new build..."
-            # Clean target and extract
+            echo "[INFO] Updating live deployment files..."
             if [ -n "$SUDO" ]; then
-              $SUDO rm -rf "$SERVER_PATH"/dist "$SERVER_PATH"/package.json "$SERVER_PATH"/package-lock.json || true
-              $SUDO tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$SERVER_PATH" --strip-components=1
+              $SUDO rm -rf "$SERVER_PATH/dist" "$SERVER_PATH/package.json" "$SERVER_PATH/package-lock.json"
+              $SUDO cp -a "$RELEASE_DIR/dist" "$SERVER_PATH/"
+              $SUDO cp "$RELEASE_DIR/package.json" "$SERVER_PATH/package.json"
+              $SUDO cp "$RELEASE_DIR/package-lock.json" "$SERVER_PATH/package-lock.json"
             else
-              rm -rf "$SERVER_PATH"/dist "$SERVER_PATH"/package.json "$SERVER_PATH"/package-lock.json || true
-              tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$SERVER_PATH" --strip-components=1
+              rm -rf "$SERVER_PATH/dist" "$SERVER_PATH/package.json" "$SERVER_PATH/package-lock.json"
+              cp -a "$RELEASE_DIR/dist" "$SERVER_PATH/"
+              cp "$RELEASE_DIR/package.json" "$SERVER_PATH/package.json"
+              cp "$RELEASE_DIR/package-lock.json" "$SERVER_PATH/package-lock.json"
             fi
 
             # Verify build (check for server.js entry point)
             if [ ! -f "$SERVER_PATH/dist/server.js" ]; then
               echo "[ERROR] Server deployment failed - dist/server.js not found"
               echo "[INFO] Restoring from backup..."
-              if [ -n "$SUDO" ]; then
-                $SUDO rm -rf "$SERVER_PATH"/dist || true
-                $SUDO cp -a "$BACKUP_PATH/dist" "$SERVER_PATH/" || true
-              else
-                rm -rf "$SERVER_PATH"/dist || true
-                cp -a "$BACKUP_PATH/dist" "$SERVER_PATH/" || true
+              if [ -d "$BACKUP_PATH/dist" ]; then
+                if [ -n "$SUDO" ]; then
+                  $SUDO rm -rf "$SERVER_PATH/dist"
+                  $SUDO cp -a "$BACKUP_PATH/dist" "$SERVER_PATH/"
+                else
+                  rm -rf "$SERVER_PATH/dist"
+                  cp -a "$BACKUP_PATH/dist" "$SERVER_PATH/"
+                fi
               fi
               exit 1
             fi
@@ -126,7 +150,8 @@ jobs:
             npm ci --omit=dev
 
             # Check if PM2 is available
-            if ! command -v pm2 &> /dev/null; then
+            export PATH="$PATH:$HOME/.npm-global/bin:$HOME/.local/bin"
+            if ! command -v pm2 >/dev/null 2>&1; then
               echo "[ERROR] PM2 is not installed on VPS"
               exit 1
             fi
