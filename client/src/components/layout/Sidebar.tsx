@@ -55,17 +55,20 @@ export function Sidebar() {
   const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-sidebar-border bg-sidebar-background lg:flex lg:flex-col">
-      <div className="flex h-16 items-center border-b border-sidebar-border px-4">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary">
-            <span className="text-sm font-bold text-sidebar-primary-foreground">ISM</span>
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/30 bg-white/50 shadow-lg shadow-indigo-950/5 backdrop-blur-2xl lg:flex">
+      <div className="flex h-16 items-center border-b border-white/25 px-4">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-bold text-white shadow-sm">
+            ISM
           </div>
-          <span className="text-lg font-semibold text-sidebar-foreground">Salary System</span>
+          <div>
+            <span className="block text-[15px] font-semibold tracking-tight text-slate-900">Salary</span>
+            <span className="text-[10px] font-medium uppercase tracking-widest text-slate-500">System</span>
+          </div>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
         {visibleNavItems.map((item) => {
           const isActive =
             location.pathname === item.href ||
@@ -77,28 +80,28 @@ export function Sidebar() {
               key={item.href}
               to={item.href}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                'flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200',
                 isActive
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                  : 'text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                  ? 'bg-indigo-500/15 text-indigo-700 ring-1 ring-indigo-500/20'
+                  : 'text-slate-600 hover:bg-white/60 hover:text-slate-900'
               )}
             >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
+              <item.icon className="h-5 w-5 flex-shrink-0 opacity-80" />
               <span>{item.label}</span>
             </NavLink>
           );
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3">
-        <div className="mb-3 px-3">
-          <p className="text-sm font-medium text-sidebar-foreground">{user?.full_name}</p>
-          <p className="text-xs text-sidebar-muted capitalize">{user?.role?.toLowerCase()}</p>
+      <div className="border-t border-white/30 p-3">
+        <div className="mb-3 rounded-xl bg-white/40 px-3 py-2">
+          <p className="truncate text-sm font-medium text-slate-900">{user?.full_name}</p>
+          <p className="text-xs capitalize text-slate-500">{user?.role?.toLowerCase()}</p>
         </div>
         <Button
           variant="ghost"
           onClick={logout}
-          className="w-full justify-start text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          className="w-full cursor-pointer justify-start text-slate-600 hover:bg-white/60 hover:text-slate-900"
         >
           <LogOut className="h-5 w-5" />
           <span className="ml-3">Logout</span>

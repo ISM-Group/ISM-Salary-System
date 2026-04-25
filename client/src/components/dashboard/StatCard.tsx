@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { motion, useReducedMotion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
 
 interface StatCardProps {
@@ -10,37 +11,52 @@ interface StatCardProps {
     value: number;
     isPositive: boolean;
   };
+  /** Stagger order for glass dashboard enter animation (0-based). */
+  staggerIndex?: number;
   className?: string;
 }
 
-export function StatCard({ title, value, description, icon: Icon, trend, className }: StatCardProps) {
+export function StatCard({ title, value, description, icon: Icon, trend, staggerIndex = 0, className }: StatCardProps) {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <div className={cn('stat-card animate-slide-up', className)}>
+    <motion.div
+      className={cn('stat-card', className)}
+      initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        type: 'spring',
+        stiffness: 380,
+        damping: 32,
+        delay: reduceMotion ? 0 : staggerIndex * 0.06,
+      }}
+    >
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1 flex-1 min-w-0">
-          <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
-          <p className="text-2xl sm:text-3xl font-semibold text-foreground break-words">{value}</p>
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="truncate text-xs font-medium text-slate-600 sm:text-sm">{title}</p>
+          <p className="break-words text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">{value}</p>
           {description && (
-            <p className="text-[10px] sm:text-xs text-muted-foreground line-clamp-2">{description}</p>
+            <p className="line-clamp-2 text-[10px] text-slate-600 sm:text-xs">{description}</p>
           )}
           {trend && (
-            <div className="flex items-center gap-1 flex-wrap">
+            <div className="flex flex-wrap items-center gap-1">
               <span
                 className={cn(
-                  'text-[10px] sm:text-xs font-medium',
-                  trend.isPositive ? 'text-success' : 'text-destructive'
+                  'text-[10px] font-medium sm:text-xs',
+                  trend.isPositive ? 'text-emerald-600' : 'text-rose-600'
                 )}
               >
-                {trend.isPositive ? '+' : ''}{trend.value}%
+                {trend.isPositive ? '+' : ''}
+                {trend.value}%
               </span>
-              <span className="text-[10px] sm:text-xs text-muted-foreground">from last month</span>
+              <span className="text-[10px] text-slate-500 sm:text-xs">from last month</span>
             </div>
           )}
         </div>
-        <div className="flex h-10 w-10 sm:h-12 sm:w-12 flex-shrink-0 items-center justify-center rounded-lg bg-accent/10">
-          <Icon className="h-5 w-5 sm:h-6 sm:w-6 text-accent" />
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 sm:h-12 sm:w-12">
+          <Icon className="h-5 w-5 text-indigo-600 sm:h-6 sm:w-6" />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -17,14 +17,16 @@ export function AdminDashboardPage() {
   return (
     <MainLayout title="Dashboard" description="Organization overview">
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Employees" value={data?.totalEmployees || 0} icon={Users} />
+        <StatCard staggerIndex={0} title="Employees" value={data?.totalEmployees || 0} icon={Users} />
         <StatCard
+          staggerIndex={1}
           title="Active Loans"
           value={data?.activeLoans?.count || 0}
           description={formatCurrency(data?.activeLoans?.total || 0)}
           icon={CreditCard}
         />
         <StatCard
+          staggerIndex={2}
           title="Monthly Salary"
           value={formatCurrency(data?.monthlySalary?.total || 0)}
           trend={{
@@ -34,6 +36,7 @@ export function AdminDashboardPage() {
           icon={TrendingUp}
         />
         <StatCard
+          staggerIndex={3}
           title="Monthly Advances"
           value={data?.pendingAdvances?.count || 0}
           description={formatCurrency(data?.pendingAdvances?.total || 0)}
