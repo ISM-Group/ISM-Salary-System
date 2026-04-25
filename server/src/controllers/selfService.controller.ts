@@ -166,6 +166,6 @@ export const getMyPayslip = async (req: AuthRequest, res: Response): Promise<voi
   req.params.employeeId = employee.id;
 
   // Import and delegate to the payslip generator
-  const { generatePayslip } = await import('./exports.controller');
+  const { generatePayslip } = await import('./exports.controller.js');
   await generatePayslip(req, res);
 };

@@ -28,4 +28,9 @@ export interface AuthUser {
  */
 export interface AuthRequest extends Request {
   user?: AuthUser;
+  body: any;
+  query: any;
+  params: any;
+  headers: any;
+  file?: any;
 }

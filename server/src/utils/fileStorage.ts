@@ -34,12 +34,12 @@ ensureUploadsDir();
  */
 // PUBLIC_INTERFACE
 export const diskStorage = multer.diskStorage({
-  destination(_req, _file, cb) {
+  destination(_req: any, _file: any, cb: any) {
     // Ensure directory exists before each write (safe for concurrent use)
     ensureUploadsDir();
     cb(null, UPLOADS_DIR);
   },
-  filename(_req, file, cb) {
+  filename(_req: any, file: any, cb: any) {
     // Generate a unique filename: timestamp-random-originalname
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
     const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');

@@ -67,16 +67,16 @@ app.use(generalLimiter);
 
 app.use(
   cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like Postman, mobile apps)
-    if (!origin) {
-      return callback(null, true);
-    }
-    
-    // In development, allow all origins
-    if (!isProduction) {
-      return callback(null, true);
-    }
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (like Postman, mobile apps)
+      if (!origin) {
+        return callback(null, true);
+      }
+      
+      // In development, allow all origins
+      if (!isProduction) {
+        return callback(null, true);
+      }
     
     // In production, only allow specific origins
     if (allowedOrigins.includes(origin)) {
@@ -107,7 +107,7 @@ app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 app.get('/health', async (req: Request, res: Response) => {
   try {
     // Attempt a simple database query to verify connectivity
-    const { query } = await import('./utils/db');
+    const { query } = await import('./utils/db.js');
     await query('SELECT 1');
     res.json({
       status: 'ok',
