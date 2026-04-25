@@ -28,16 +28,14 @@ jobs:
 
       - name: Install & Build Server
         working-directory: ./server
-        env:
-          NODE_ENV: production
         run: |
-          npm ci
+          npm ci --include=dev
           npm run build
           rm -rf node_modules
 
       - name: Compress Server Build
         run: |
-          tar -czf server-deploy.tar.gz -C server dist/ package.json
+          tar -czf server-deploy.tar.gz -C server dist/ package.json package-lock.json
 
       - name: Transfer Build to VPS
         uses: appleboy/scp-action@v0.1.7
@@ -101,10 +99,10 @@ jobs:
             echo "[INFO] Extracting new build..."
             # Clean target and extract
             if [ -n "$SUDO" ]; then
-              $SUDO rm -rf "$SERVER_PATH"/dist "$SERVER_PATH"/package.json || true
+              $SUDO rm -rf "$SERVER_PATH"/dist "$SERVER_PATH"/package.json "$SERVER_PATH"/package-lock.json || true
               $SUDO tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$SERVER_PATH" --strip-components=1
             else
-              rm -rf "$SERVER_PATH"/dist "$SERVER_PATH"/package.json || true
+              rm -rf "$SERVER_PATH"/dist "$SERVER_PATH"/package.json "$SERVER_PATH"/package-lock.json || true
               tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$SERVER_PATH" --strip-components=1
             fi
 
@@ -125,7 +123,7 @@ jobs:
             # Install dependencies
             echo "[INFO] Installing production dependencies..."
             cd "$SERVER_PATH"
-            npm ci --production
+            npm ci --omit=dev
 
             # Check if PM2 is available
             if ! command -v pm2 &> /dev/null; then
