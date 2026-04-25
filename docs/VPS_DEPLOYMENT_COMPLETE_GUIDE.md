@@ -175,26 +175,10 @@ Create file: `/etc/nginx/sites-available/ism-salary` with two separate server bl
 
 ```nginx
 # ============ CLIENT: salary.ismgroups.lk ============
-# Redirect HTTP to HTTPS
 server {
     listen 80;
     listen [::]:80;
     server_name salary.ismgroups.lk;
-    return 301 https://$server_name$request_uri;
-}
-
-# HTTPS server block for client
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name salary.ismgroups.lk;
-
-    # SSL certificates (will be added by Certbot)
-    ssl_certificate /etc/letsencrypt/live/salary.ismgroups.lk/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/salary.ismgroups.lk/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
 
     # Client (static assets - React app)
     location / {
@@ -211,26 +195,10 @@ server {
 }
 
 # ============ API: api.salary.ismgroups.lk ============
-# Redirect HTTP to HTTPS
 server {
     listen 80;
     listen [::]:80;
     server_name api.salary.ismgroups.lk;
-    return 301 https://$server_name$request_uri;
-}
-
-# HTTPS server block for API
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name api.salary.ismgroups.lk;
-
-    # SSL certificates (will be added by Certbot)
-    ssl_certificate /etc/letsencrypt/live/api.salary.ismgroups.lk/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.salary.ismgroups.lk/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
 
     # API proxy to backend (all traffic goes to Node.js)
     location / {
@@ -271,21 +239,20 @@ sudo systemctl reload nginx
 Generate SSL certificates for **both subdomains**:
 
 ```bash
-sudo certbot certonly --nginx -d salary.ismgroups.lk
-sudo certbot certonly --nginx -d api.salary.ismgroups.lk
+sudo certbot --nginx -d salary.ismgroups.lk --redirect
+sudo certbot --nginx -d api.salary.ismgroups.lk --redirect
 ```
 
 Follow the prompts. Certbot will:
 - Validate domain ownership
-- Install SSL certificates to:
-  - `/etc/letsencrypt/live/salary.ismgroups.lk/`
-  - `/etc/letsencrypt/live/api.salary.ismgroups.lk/`
+- Install SSL certificates
+- Update the matching Nginx server blocks for HTTPS
 - Auto-renew (cron job added)
 
 Verify SSL:
 ```bash
 curl -I https://salary.ismgroups.lk
-curl -I https://api.salary.ismgroups.lk
+curl -I https://api.salary.ismgroups.lk/health
 ```
 
 ---
@@ -419,7 +386,7 @@ sudo systemctl status nginx
 pm2 status
 
 # Check if backend is responding
-curl -I https://salary.ismgroups.lk/api/health
+curl -I https://api.salary.ismgroups.lk/health
 
 # Check database connection
 mysql -u mrfawz_user -p -e "SELECT VERSION();"

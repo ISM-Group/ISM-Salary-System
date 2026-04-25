@@ -79,19 +79,8 @@ sudo tee /etc/nginx/sites-available/ism-salary > /dev/null <<'EOF'
 # ============ CLIENT: salary.ismgroups.lk ============
 server {
     listen 80;
+    listen [::]:80;
     server_name salary.ismgroups.lk;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name salary.ismgroups.lk;
-    
-    ssl_certificate /etc/letsencrypt/live/salary.ismgroups.lk/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/salary.ismgroups.lk/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
     
     location / {
         root /var/www/ism-client;
@@ -108,19 +97,8 @@ server {
 # ============ API: api.salary.ismgroups.lk ============
 server {
     listen 80;
+    listen [::]:80;
     server_name api.salary.ismgroups.lk;
-    return 301 https://$server_name$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name api.salary.ismgroups.lk;
-    
-    ssl_certificate /etc/letsencrypt/live/api.salary.ismgroups.lk/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.salary.ismgroups.lk/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
     
     location / {
         proxy_pass http://localhost:5002;
@@ -155,15 +133,15 @@ sudo systemctl reload nginx
 ### 4. Create SSL certificates with Certbot
 
 ```bash
-# This will automatically update Nginx config with cert paths
-sudo certbot certonly --nginx -d salary.ismgroups.lk
-sudo certbot certonly --nginx -d api.salary.ismgroups.lk
+# Certbot will add HTTPS server blocks and HTTP->HTTPS redirects
+sudo certbot --nginx -d salary.ismgroups.lk --redirect
+sudo certbot --nginx -d api.salary.ismgroups.lk --redirect
 ```
 
 **Verify SSL works:**
 ```bash
 curl -I https://salary.ismgroups.lk
-curl -I https://api.salary.ismgroups.lk
+curl -I https://api.salary.ismgroups.lk/health
 # Should return 200/301 with SSL info
 ```
 

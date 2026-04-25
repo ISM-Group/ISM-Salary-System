@@ -134,25 +134,10 @@ Create Nginx config with two separate server blocks (one for client, one for API
 ```bash
 sudo cat > /etc/nginx/sites-available/ism-salary << 'EOF'
 # ============ CLIENT: salary.ismgroups.lk ============
-# HTTP to HTTPS redirect
 server {
     listen 80;
     listen [::]:80;
     server_name salary.ismgroups.lk;
-    return 301 https://$server_name$request_uri;
-}
-
-# HTTPS client server
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name salary.ismgroups.lk;
-
-    ssl_certificate /etc/letsencrypt/live/salary.ismgroups.lk/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/salary.ismgroups.lk/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
 
     # Client static files (React app)
     location / {
@@ -168,25 +153,10 @@ server {
 }
 
 # ============ API: api.salary.ismgroups.lk ============
-# HTTP to HTTPS redirect
 server {
     listen 80;
     listen [::]:80;
     server_name api.salary.ismgroups.lk;
-    return 301 https://$server_name$request_uri;
-}
-
-# HTTPS API server
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name api.salary.ismgroups.lk;
-
-    ssl_certificate /etc/letsencrypt/live/api.salary.ismgroups.lk/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/api.salary.ismgroups.lk/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
 
     # All traffic to backend
     location / {
@@ -228,24 +198,18 @@ sudo systemctl reload nginx
 Generate SSL certificates for **both subdomains**:
 
 ```bash
-# Certificate for client subdomain
-sudo certbot certonly --nginx -d salary.ismgroups.lk
-
-# Certificate for API subdomain
-sudo certbot certonly --nginx -d api.salary.ismgroups.lk
+# Certbot will update the Nginx file and add redirects to HTTPS
+sudo certbot --nginx -d salary.ismgroups.lk --redirect
+sudo certbot --nginx -d api.salary.ismgroups.lk --redirect
 ```
 
-Follow prompts. Certificates installed to:
-- `/etc/letsencrypt/live/salary.ismgroups.lk/`
-- `/etc/letsencrypt/live/api.salary.ismgroups.lk/`
+Follow prompts. Certbot will create certificates and update the matching
+server blocks automatically.
 
 Verify SSL:
 ```bash
 curl -I https://salary.ismgroups.lk
-# Should return 200 OK or 404 (if no client files deployed yet)
-
-curl -I https://api.salary.ismgroups.lk
-# Should return 502 Bad Gateway (backend not running yet, that's OK)
+curl -I https://api.salary.ismgroups.lk/health
 ```
 
 ---
@@ -369,7 +333,7 @@ git push origin main                # Triggers GitHub Actions
 |---------|----------|
 | DNS not working | Wait 30 min, check **both A records** in registrar, verify `nslookup salary.ismgroups.lk` and `nslookup api.salary.ismgroups.lk` |
 | 502 Bad Gateway on api subdomain | SSH to VPS, run `pm2 status` and `pm2 logs ism-server` |
-| SSL not working | Run `sudo certbot certonly --nginx -d salary.ismgroups.lk` AND `sudo certbot certonly --nginx -d api.salary.ismgroups.lk` |
+| SSL not working | Run `sudo certbot --nginx -d salary.ismgroups.lk --redirect` and `sudo certbot --nginx -d api.salary.ismgroups.lk --redirect` |
 | Client page returns 404 | Check files in `/var/www/ism-client`, run client workflow |
 | API fails to respond | Check Nginx proxy config, verify backend runs on `localhost:5002` |
 | GitHub Actions fails | Check Secret values, verify SSH key permissions (600), check action logs |
