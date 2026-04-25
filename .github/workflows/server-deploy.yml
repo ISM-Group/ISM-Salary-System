@@ -86,7 +86,7 @@ jobs:
             echo "[INFO] Preparing release files in $RELEASE_DIR"
             rm -rf "$RELEASE_DIR" "$BACKUP_PATH"
             mkdir -p "$RELEASE_DIR" "$BACKUP_PATH"
-            tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$RELEASE_DIR" --strip-components=1
+            tar -xzf "$TEMP_DIR/server-deploy.tar.gz" -C "$RELEASE_DIR"
 
             if [ ! -f "$RELEASE_DIR/dist/server.js" ]; then
               echo "[ERROR] Release package is invalid - dist/server.js not found"
