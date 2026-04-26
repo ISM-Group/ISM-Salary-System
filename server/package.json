@@ -7,7 +7,8 @@
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "seed:login-users": "node scripts/seed-login-users.js"
   },
   "dependencies": {
     "@mapbox/node-pre-gyp": "^1.0.11",

@@ -30,7 +30,7 @@ jobs:
         working-directory: ./client
         env:
           CI: true
-          VITE_API_URL: https://api.salary.ismgroups.lk/api
+          VITE_API_URL: https://api.salary.ismgroup.lk/api
         run: |
           npm ci
           npm run build
