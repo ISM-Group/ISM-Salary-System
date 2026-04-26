@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { employeesAPI, loansAPI } from '@/lib/api';
+import { employeesAPI, getApiErrorMessage, loansAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Pagination } from '@/components/ui/pagination';
 import { formatCurrency } from '@/lib/utils';
 import { AlertCircle } from 'lucide-react';
+import { isPositiveNumber } from '@/lib/formValidation';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * LoansPage — Manages employee loans with MONTHLY and DAILY repayment modes.
@@ -24,6 +26,8 @@ export function LoansPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [page, setPage] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
   const limit = 20;
 
   const { data: employeesData } = useQuery({
@@ -52,6 +56,20 @@ export function LoansPage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setMessage(null);
+    if (!employeeId) {
+      setMessage({ type: 'error', text: 'Select an employee.' });
+      return;
+    }
+    if (!isPositiveNumber(loanAmount)) {
+      setMessage({ type: 'error', text: 'Loan amount must be greater than zero.' });
+      return;
+    }
+    if (repaymentMode === 'DAILY' && !isPositiveNumber(dailyRepaymentAmount)) {
+      setMessage({ type: 'error', text: 'Daily deduction must be greater than zero.' });
+      return;
+    }
+
+    setSaving(true);
     try {
       await loansAPI.create({
         employeeId,
@@ -65,9 +83,10 @@ export function LoansPage() {
       setRepaymentMode('MONTHLY');
       setDailyRepaymentAmount('');
       await refetch();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || 'Failed to create loan.';
-      setMessage({ type: 'error', text: errMsg });
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to create loan.') });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -196,7 +215,7 @@ export function LoansPage() {
                 )}
               </div>
 
-              <Button type="submit">Create Loan</Button>
+              <Button type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create Loan'}</Button>
             </form>
           </CardContent>
         </Card>
@@ -324,8 +343,13 @@ export function LoansPage() {
                             size="sm"
                             onClick={async () => {
                               const newStatus = loan.status === 'ACTIVE' ? 'PAID' : 'ACTIVE';
-                              await loansAPI.update(loan.id, { status: newStatus });
-                              await refetch();
+                              try {
+                                await loansAPI.update(loan.id, { status: newStatus });
+                                await refetch();
+                                toast({ title: newStatus === 'PAID' ? 'Loan marked paid' : 'Loan reactivated' });
+                              } catch (err) {
+                                setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to update loan.') });
+                              }
                             }}
                           >
                             {loan.status === 'ACTIVE' ? 'Mark Paid' : 'Reactivate'}

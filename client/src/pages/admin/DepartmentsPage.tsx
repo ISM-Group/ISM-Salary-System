@@ -1,16 +1,20 @@
 import { FormEvent, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { departmentsAPI } from '@/lib/api';
+import { departmentsAPI, getApiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { useToast } from '@/hooks/use-toast';
 
 export function DepartmentsPage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   const { data, refetch } = useQuery({
     queryKey: ['departments-admin'],
@@ -34,15 +38,30 @@ export function DepartmentsPage() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-      await departmentsAPI.update(editingId, { name, description });
-      setEditingId(null);
-    } else {
-      await departmentsAPI.create({ name, description });
+    if (!name.trim()) {
+      setError('Department name is required.');
+      return;
     }
-    setName('');
-    setDescription('');
-    await refetch();
+
+    setSaving(true);
+    setError(null);
+    try {
+      if (editingId) {
+        await departmentsAPI.update(editingId, { name: name.trim(), description: description.trim() || null });
+        setEditingId(null);
+        toast({ title: 'Department updated' });
+      } else {
+        await departmentsAPI.create({ name: name.trim(), description: description.trim() || null });
+        toast({ title: 'Department created' });
+      }
+      setName('');
+      setDescription('');
+      await refetch();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to save department.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -54,6 +73,7 @@ export function DepartmentsPage() {
           </CardHeader>
           <CardContent>
             <form className="grid gap-4 md:grid-cols-3" onSubmit={submit}>
+              {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 md:col-span-3">{error}</p>}
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Department name" required />
               <Input
                 value={description}
@@ -61,7 +81,7 @@ export function DepartmentsPage() {
                 placeholder="Description"
               />
               <div className="flex gap-2">
-                <Button type="submit">{editingId ? 'Save Changes' : 'Add Department'}</Button>
+                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Department'}</Button>
                 {editingId && (
                   <Button type="button" variant="outline" onClick={cancelEdit}>
                     Cancel
@@ -106,9 +126,14 @@ export function DepartmentsPage() {
                             if (!window.confirm(`Delete ${row.name}?`)) {
                               return;
                             }
-                            await departmentsAPI.delete(row.id);
-                            if (editingId === row.id) cancelEdit();
-                            await refetch();
+                            try {
+                              await departmentsAPI.delete(row.id);
+                              if (editingId === row.id) cancelEdit();
+                              await refetch();
+                              toast({ title: 'Department deleted' });
+                            } catch (err) {
+                              setError(getApiErrorMessage(err, 'Failed to delete department.'));
+                            }
                           }}
                         >
                           Delete

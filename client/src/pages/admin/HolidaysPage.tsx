@@ -13,8 +13,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { holidaysAPI, employeesAPI } from '@/lib/api';
+import { holidaysAPI, employeesAPI, getApiErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { isIsoDate } from '@/lib/formValidation';
+import { useToast } from '@/hooks/use-toast';
 import {
   Calendar,
   Plus,
@@ -85,6 +87,7 @@ interface HolidayFormData {
 export function HolidaysPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const { toast } = useToast();
 
   // State
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -120,9 +123,8 @@ export function HolidaysPage() {
       const to = `${selectedYear}-12-31`;
       const result = await holidaysAPI.getAll({ from, to });
       setHolidays(result.data || []);
-    } catch (err: any) {
-      console.error('Failed to fetch holidays:', err);
-      setMessage({ type: 'error', text: 'Failed to fetch holidays.' });
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to fetch holidays.') });
       setHolidays([]);
     } finally {
       setLoading(false);
@@ -143,8 +145,8 @@ export function HolidaysPage() {
           departmentName: e.departmentName || e.department_name,
         }))
       );
-    } catch (err: any) {
-      console.error('Failed to fetch employees:', err);
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to fetch employees.') });
     }
   }, []);
 
@@ -199,8 +201,13 @@ export function HolidaysPage() {
    * Saves (creates or updates) a holiday.
    */
   const handleSave = async () => {
-    if (!formData.date || !formData.name) {
-      setMessage({ type: 'error', text: 'Date and name are required.' });
+    if (!isIsoDate(formData.date)) {
+      setMessage({ type: 'error', text: 'Select a valid holiday date.' });
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      setMessage({ type: 'error', text: 'Holiday name is required.' });
       return;
     }
 
@@ -215,27 +222,28 @@ export function HolidaysPage() {
       if (editingId) {
         await holidaysAPI.update(editingId, {
           date: formData.date,
-          name: formData.name,
+          name: formData.name.trim(),
           type: formData.type,
           scope: formData.scope,
           employeeIds: formData.scope === 'PER_EMPLOYEE' ? formData.employeeIds : undefined,
         });
         setMessage({ type: 'success', text: 'Holiday updated successfully.' });
+        toast({ title: 'Holiday updated' });
       } else {
         await holidaysAPI.create({
           date: formData.date,
-          name: formData.name,
+          name: formData.name.trim(),
           type: formData.type,
           scope: formData.scope,
           employeeIds: formData.scope === 'PER_EMPLOYEE' ? formData.employeeIds : undefined,
         });
         setMessage({ type: 'success', text: 'Holiday created successfully.' });
+        toast({ title: 'Holiday created' });
       }
       resetForm();
       await fetchHolidays();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || 'Failed to save holiday.';
-      setMessage({ type: 'error', text: errMsg });
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to save holiday.') });
     } finally {
       setSaving(false);
     }
@@ -251,10 +259,10 @@ export function HolidaysPage() {
     try {
       await holidaysAPI.delete(id);
       setMessage({ type: 'success', text: 'Holiday deleted successfully.' });
+      toast({ title: 'Holiday deleted' });
       await fetchHolidays();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || 'Failed to delete holiday.';
-      setMessage({ type: 'error', text: errMsg });
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to delete holiday.') });
     } finally {
       setDeletingId(null);
     }

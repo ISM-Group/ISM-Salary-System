@@ -1,18 +1,23 @@
 import { FormEvent, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { departmentsAPI, rolesAPI } from '@/lib/api';
+import { departmentsAPI, getApiErrorMessage, rolesAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
+import { isNonNegativeNumber } from '@/lib/formValidation';
+import { useToast } from '@/hooks/use-toast';
 
 export function RolesPage() {
   const [name, setName] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [dailyWage, setDailyWage] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const { toast } = useToast();
 
   const { data: departmentsData } = useQuery({
     queryKey: ['departments-for-roles'],
@@ -45,21 +50,45 @@ export function RolesPage() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) {
+      setError('Role name is required.');
+      return;
+    }
+    if (!departmentId) {
+      setError('Select a department.');
+      return;
+    }
+    if (!isNonNegativeNumber(dailyWage)) {
+      setError('Daily wage must be zero or more.');
+      return;
+    }
+
     const payload = {
-      name,
+      name: name.trim(),
       departmentId,
       dailyWage: dailyWage ? Number(dailyWage) : null,
     };
-    if (editingId) {
-      await rolesAPI.update(editingId, payload);
-      setEditingId(null);
-    } else {
-      await rolesAPI.create(payload);
+
+    setSaving(true);
+    setError(null);
+    try {
+      if (editingId) {
+        await rolesAPI.update(editingId, payload);
+        setEditingId(null);
+        toast({ title: 'Role updated' });
+      } else {
+        await rolesAPI.create(payload);
+        toast({ title: 'Role created' });
+      }
+      setName('');
+      setDepartmentId('');
+      setDailyWage('');
+      await refetch();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to save role.'));
+    } finally {
+      setSaving(false);
     }
-    setName('');
-    setDepartmentId('');
-    setDailyWage('');
-    await refetch();
   };
 
   return (
@@ -71,6 +100,7 @@ export function RolesPage() {
           </CardHeader>
           <CardContent>
             <form className="grid gap-4 md:grid-cols-4" onSubmit={submit}>
+              {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 md:col-span-4">{error}</p>}
               <Input placeholder="Role name" value={name} onChange={(e) => setName(e.target.value)} required />
               <select
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
@@ -92,7 +122,7 @@ export function RolesPage() {
                 onChange={(e) => setDailyWage(e.target.value)}
               />
               <div className="flex gap-2">
-                <Button type="submit">{editingId ? 'Save Changes' : 'Add Role'}</Button>
+                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : editingId ? 'Save Changes' : 'Add Role'}</Button>
                 {editingId && (
                   <Button type="button" variant="outline" onClick={cancelEdit}>
                     Cancel
@@ -139,9 +169,14 @@ export function RolesPage() {
                             if (!window.confirm(`Delete ${r.name}?`)) {
                               return;
                             }
-                            await rolesAPI.delete(r.id);
-                            if (editingId === r.id) cancelEdit();
-                            await refetch();
+                            try {
+                              await rolesAPI.delete(r.id);
+                              if (editingId === r.id) cancelEdit();
+                              await refetch();
+                              toast({ title: 'Role deleted' });
+                            } catch (err) {
+                              setError(getApiErrorMessage(err, 'Failed to delete role.'));
+                            }
                           }}
                         >
                           Delete

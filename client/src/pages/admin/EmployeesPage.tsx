@@ -15,7 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/pagination';
 import { Link } from 'react-router-dom';
 import { Plus, Search, Eye, Pencil, Loader2, Trash2 } from 'lucide-react';
-import { employeesAPI, departmentsAPI } from '@/lib/api';
+import { employeesAPI, departmentsAPI, getApiErrorMessage } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 // PUBLIC_INTERFACE
 /**
@@ -27,6 +28,8 @@ export function EmployeesPage() {
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
   const limit = 20;
 
   // Fetch departments for filter
@@ -70,6 +73,11 @@ export function EmployeesPage() {
   return (
     <MainLayout title="Employees" description="Manage your organization's employees">
       <div className="space-y-4 sm:space-y-6">
+        {error && (
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
         {/* Filters and Actions */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-col sm:flex-row flex-1 gap-3">
@@ -169,8 +177,14 @@ export function EmployeesPage() {
                           if (!window.confirm('Delete this employee?')) {
                             return;
                           }
-                          await employeesAPI.delete(employee.id);
-                          await refetch();
+                          try {
+                            setError(null);
+                            await employeesAPI.delete(employee.id);
+                            await refetch();
+                            toast({ title: 'Employee deleted' });
+                          } catch (err) {
+                            setError(getApiErrorMessage(err, 'Failed to delete employee.'));
+                          }
                         }}
                       >
                         <Trash2 className="h-4 w-4 text-destructive" />

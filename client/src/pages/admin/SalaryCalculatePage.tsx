@@ -1,13 +1,14 @@
 import { FormEvent, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { employeesAPI, salaryAPI } from '@/lib/api';
+import { employeesAPI, getApiErrorMessage, salaryAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils';
 import { Calculator, AlertCircle } from 'lucide-react';
+import { isIsoDate, isNonNegativeNumber } from '@/lib/formValidation';
 
 /**
  * SalaryCalculatePage — Run monthly salary calculations for employees.
@@ -43,6 +44,19 @@ export function SalaryCalculatePage() {
    */
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!employeeId) {
+      setError('Select an employee.');
+      return;
+    }
+    if (!isIsoDate(month)) {
+      setError('Select a valid month date.');
+      return;
+    }
+    if (!isNonNegativeNumber(bonus)) {
+      setError('Bonus must be zero or more.');
+      return;
+    }
+
     setCalculating(true);
     setError(null);
     setResult(null);
@@ -53,9 +67,8 @@ export function SalaryCalculatePage() {
         bonus: Number(bonus),
       });
       setResult(response.data);
-    } catch (err: any) {
-      const msg = err.response?.data?.error || 'Failed to calculate salary.';
-      setError(msg);
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to calculate salary.'));
     } finally {
       setCalculating(false);
     }

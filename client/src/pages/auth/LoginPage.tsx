@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { LogIn, Shield } from 'lucide-react';
+import { getApiErrorMessage } from '@/lib/api';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -23,11 +24,17 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    if (!username.trim() || !password) {
+      setError('Enter your username and password.');
+      setLoading(false);
+      return;
+    }
+
     try {
       await login(username, password);
       navigate(nextPath, { replace: true });
-    } catch {
-      setError('Invalid username or password');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Invalid username or password'));
     } finally {
       setLoading(false);
     }

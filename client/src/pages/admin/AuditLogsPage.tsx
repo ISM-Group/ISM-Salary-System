@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { auditLogsAPI } from '@/lib/api';
+import { auditLogsAPI, getApiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +18,8 @@ export function AuditLogsPage() {
   const [verified, setVerified] = useState(false);
   const [tableFilter, setTableFilter] = useState('');
   const [page, setPage] = useState(1);
+  const [error, setError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
   const limit = 25;
 
   const { data: responseData, refetch } = useQuery({
@@ -38,9 +40,22 @@ export function AuditLogsPage() {
 
   const verify = async (e: FormEvent) => {
     e.preventDefault();
-    await auditLogsAPI.verifyPasskey(passkey);
-    setVerified(true);
-    await refetch();
+    if (!passkey.trim()) {
+      setError('Enter the audit passkey.');
+      return;
+    }
+
+    setVerifying(true);
+    setError(null);
+    try {
+      await auditLogsAPI.verifyPasskey(passkey.trim());
+      setVerified(true);
+      await refetch();
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Invalid audit passkey.'));
+    } finally {
+      setVerifying(false);
+    }
   };
 
   return (
@@ -52,7 +67,12 @@ export function AuditLogsPage() {
               <CardTitle>Verify Passkey</CardTitle>
             </CardHeader>
             <CardContent>
-              <form className="flex gap-3" onSubmit={verify}>
+              <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={verify}>
+                {error && (
+                  <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 sm:col-span-2">
+                    {error}
+                  </p>
+                )}
                 <Input
                   type="password"
                   value={passkey}
@@ -60,7 +80,7 @@ export function AuditLogsPage() {
                   placeholder="Enter audit passkey"
                   required
                 />
-                <Button type="submit">Verify</Button>
+                <Button type="submit" disabled={verifying}>{verifying ? 'Verifying...' : 'Verify'}</Button>
               </form>
             </CardContent>
           </Card>

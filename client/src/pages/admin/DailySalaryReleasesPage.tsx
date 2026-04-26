@@ -12,9 +12,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { dailyReleasesAPI } from '@/lib/api';
+import { dailyReleasesAPI, getApiErrorMessage } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Banknote, RefreshCw, CheckCircle, AlertCircle, Trash2, History, X } from 'lucide-react';
+import { isIsoDate } from '@/lib/formValidation';
+import { useToast } from '@/hooks/use-toast';
 
 /** Shape of a single daily release record from the API */
 interface DailyRelease {
@@ -96,6 +98,7 @@ function formatCurrency(amount: number): string {
 export function DailySalaryReleasesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'ADMIN';
+  const { toast } = useToast();
 
   // State
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -127,9 +130,8 @@ export function DailySalaryReleasesPage() {
       const result = await dailyReleasesAPI.getAll(selectedDate);
       setReleases(result.data || []);
       setSummary(result.summary || null);
-    } catch (err: any) {
-      console.error('Failed to fetch daily releases:', err);
-      setMessage({ type: 'error', text: 'Failed to fetch daily releases.' });
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to fetch daily releases.') });
       setReleases([]);
       setSummary(null);
     } finally {
@@ -147,6 +149,11 @@ export function DailySalaryReleasesPage() {
    * Only creates records for PRESENT daily-wage employees who don't already have one.
    */
   const handleGenerate = async () => {
+    if (!isIsoDate(selectedDate)) {
+      setMessage({ type: 'error', text: 'Select a valid release date.' });
+      return;
+    }
+
     setGenerating(true);
     setMessage(null);
     try {
@@ -155,11 +162,11 @@ export function DailySalaryReleasesPage() {
         type: 'success',
         text: result.message || `Generated ${result.data?.generated || 0} release(s).`,
       });
+      toast({ title: 'Daily releases generated' });
       // Refresh the list after generation
       await fetchReleases();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || 'Failed to generate daily releases.';
-      setMessage({ type: 'error', text: errMsg });
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to generate daily releases.') });
     } finally {
       setGenerating(false);
     }
@@ -175,10 +182,10 @@ export function DailySalaryReleasesPage() {
     try {
       await dailyReleasesAPI.release(id);
       setMessage({ type: 'success', text: 'Daily salary released successfully.' });
+      toast({ title: 'Daily salary released' });
       await fetchReleases();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || 'Failed to release daily salary.';
-      setMessage({ type: 'error', text: errMsg });
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to release daily salary.') });
     } finally {
       setReleasingId(null);
     }
@@ -194,10 +201,10 @@ export function DailySalaryReleasesPage() {
     try {
       await dailyReleasesAPI.deleteRelease(id);
       setMessage({ type: 'success', text: 'Release record deleted successfully.' });
+      toast({ title: 'Release deleted' });
       await fetchReleases();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || 'Failed to delete release record.';
-      setMessage({ type: 'error', text: errMsg });
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to delete release record.') });
     } finally {
       setDeletingId(null);
     }
@@ -207,6 +214,11 @@ export function DailySalaryReleasesPage() {
    * Bulk-releases all PENDING records for the selected date.
    */
   const handleReleaseAll = async () => {
+    if (!isIsoDate(selectedDate)) {
+      setMessage({ type: 'error', text: 'Select a valid release date.' });
+      return;
+    }
+
     setReleasingAll(true);
     setMessage(null);
     try {
@@ -215,10 +227,10 @@ export function DailySalaryReleasesPage() {
         type: 'success',
         text: result.message || `Released ${result.data?.released || 0} record(s).`,
       });
+      toast({ title: 'Daily salaries released' });
       await fetchReleases();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || 'Failed to bulk-release daily salaries.';
-      setMessage({ type: 'error', text: errMsg });
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to bulk-release daily salaries.') });
     } finally {
       setReleasingAll(false);
     }
@@ -246,8 +258,8 @@ export function DailySalaryReleasesPage() {
       const result = await dailyReleasesAPI.getByEmployee(employeeId, { from, to });
       setHistoryRecords(result.data || []);
       setHistorySummary(result.summary || null);
-    } catch (err: any) {
-      console.error('Failed to fetch employee release history:', err);
+    } catch (err) {
+      setMessage({ type: 'error', text: getApiErrorMessage(err, 'Failed to fetch employee release history.') });
     } finally {
       setHistoryLoading(false);
     }

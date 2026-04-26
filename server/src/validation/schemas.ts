@@ -17,6 +17,9 @@ const monthString = z.string().regex(/^\d{4}-\d{2}(-\d{2})?$/, 'Month must be in
 /** Positive decimal amount */
 const positiveAmount = z.number().positive('Amount must be positive');
 
+/** Treat blank form strings as empty optional values. */
+const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value);
+
 // ─── Auth Schemas ────────────────────────────────────────────────────
 
 // PUBLIC_INTERFACE
@@ -42,18 +45,18 @@ export const loginSchema = z.object({
 export const createEmployeeSchema = z.object({
   employeeId: z.string().min(1, 'Employee ID is required').max(50),
   fullName: z.string().min(1, 'Full name is required').max(150),
-  email: z.string().email('Invalid email format').max(150).nullable().optional(),
-  phone: z.string().max(30).nullable().optional(),
+  email: z.preprocess(blankToNull, z.string().email('Invalid email format').max(150).nullable().optional()),
+  phone: z.preprocess(blankToNull, z.string().max(30).nullable().optional()),
   departmentId: uuidString,
-  roleId: z.string().nullable().optional(),
+  roleId: z.preprocess(blankToNull, z.string().nullable().optional()),
   hireDate: dateString,
   salaryType: z.enum(['FIXED', 'DAILY_WAGE']).optional().default('DAILY_WAGE'),
   baseSalary: z.number().min(0).nullable().optional(),
   isActive: z.boolean().optional().default(true),
-  addressLine1: z.string().max(255).nullable().optional(),
-  addressLine2: z.string().max(255).nullable().optional(),
-  city: z.string().max(100).nullable().optional(),
-  region: z.string().max(100).nullable().optional(),
+  addressLine1: z.preprocess(blankToNull, z.string().max(255).nullable().optional()),
+  addressLine2: z.preprocess(blankToNull, z.string().max(255).nullable().optional()),
+  city: z.preprocess(blankToNull, z.string().max(100).nullable().optional()),
+  region: z.preprocess(blankToNull, z.string().max(100).nullable().optional()),
 });
 
 // PUBLIC_INTERFACE
@@ -61,18 +64,18 @@ export const createEmployeeSchema = z.object({
 export const updateEmployeeSchema = z.object({
   employeeId: z.string().min(1).max(50).optional(),
   fullName: z.string().min(1).max(150).optional(),
-  email: z.string().email('Invalid email format').max(150).nullable().optional(),
-  phone: z.string().max(30).nullable().optional(),
+  email: z.preprocess(blankToNull, z.string().email('Invalid email format').max(150).nullable().optional()),
+  phone: z.preprocess(blankToNull, z.string().max(30).nullable().optional()),
   departmentId: z.string().optional(),
-  roleId: z.string().nullable().optional(),
+  roleId: z.preprocess(blankToNull, z.string().nullable().optional()),
   hireDate: optionalDateString,
   salaryType: z.enum(['FIXED', 'DAILY_WAGE']).optional(),
   baseSalary: z.number().min(0).nullable().optional(),
   isActive: z.boolean().optional(),
-  addressLine1: z.string().max(255).nullable().optional(),
-  addressLine2: z.string().max(255).nullable().optional(),
-  city: z.string().max(100).nullable().optional(),
-  region: z.string().max(100).nullable().optional(),
+  addressLine1: z.preprocess(blankToNull, z.string().max(255).nullable().optional()),
+  addressLine2: z.preprocess(blankToNull, z.string().max(255).nullable().optional()),
+  city: z.preprocess(blankToNull, z.string().max(100).nullable().optional()),
+  region: z.preprocess(blankToNull, z.string().max(100).nullable().optional()),
 });
 
 // ─── Department Schemas ──────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { advanceSalariesAPI, employeesAPI } from '@/lib/api';
+import { advanceSalariesAPI, employeesAPI, getApiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatCurrency } from '@/lib/utils';
 import { CheckCircle, XCircle, Filter } from 'lucide-react';
+import { isIsoDate, isPositiveNumber } from '@/lib/formValidation';
+import { useToast } from '@/hooks/use-toast';
 
 /**
  * AdvanceSalariesPage — Manages salary advance records with approval workflow.
@@ -29,6 +31,9 @@ export function AdvanceSalariesPage() {
   const [notes, setNotes] = useState('');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const { data: employeesData } = useQuery({
     queryKey: ['employees-for-advance'],
@@ -51,16 +56,38 @@ export function AdvanceSalariesPage() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!employeeId) {
+      setMessage('Select an employee.');
+      return;
+    }
+    if (!isPositiveNumber(amount)) {
+      setMessage('Advance amount must be greater than zero.');
+      return;
+    }
+    if (!isIsoDate(advanceDate)) {
+      setMessage('Select a valid advance date.');
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
     const formData = new FormData();
     formData.append('employeeId', employeeId);
     formData.append('amount', amount);
     formData.append('advanceDate', advanceDate);
-    formData.append('notes', notes);
-    await advanceSalariesAPI.create(formData);
-    setEmployeeId('');
-    setAmount('');
-    setNotes('');
-    await refetch();
+    formData.append('notes', notes.trim());
+    try {
+      await advanceSalariesAPI.create(formData);
+      setEmployeeId('');
+      setAmount('');
+      setNotes('');
+      await refetch();
+      toast({ title: 'Advance salary created' });
+    } catch (err) {
+      setMessage(getApiErrorMessage(err, 'Failed to create advance salary.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   /**
@@ -72,8 +99,9 @@ export function AdvanceSalariesPage() {
     try {
       await advanceSalariesAPI.updateStatus(id, status);
       await refetch();
+      toast({ title: status === 'APPROVED' ? 'Advance approved' : 'Advance rejected' });
     } catch (err) {
-      console.error('Failed to update advance status:', err);
+      setMessage(getApiErrorMessage(err, 'Failed to update advance status.'));
     } finally {
       setUpdatingId(null);
     }
@@ -122,6 +150,11 @@ export function AdvanceSalariesPage() {
           </CardHeader>
           <CardContent>
             <form className="grid gap-4 md:grid-cols-5" onSubmit={submit}>
+              {message && (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 md:col-span-5">
+                  {message}
+                </p>
+              )}
               <select
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={employeeId}
@@ -138,7 +171,7 @@ export function AdvanceSalariesPage() {
               <Input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" required />
               <Input type="date" value={advanceDate} onChange={(e) => setAdvanceDate(e.target.value)} required />
               <Input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-              <Button type="submit">Create</Button>
+              <Button type="submit" disabled={saving}>{saving ? 'Creating...' : 'Create'}</Button>
             </form>
             <p className="mt-2 text-xs text-gray-500">
               New advances default to APPROVED status and are immediately deducted from daily salary releases on the advance date.

@@ -1,11 +1,13 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { attendanceAPI, employeesAPI, departmentsAPI } from '@/lib/api';
+import { attendanceAPI, employeesAPI, departmentsAPI, getApiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { isIsoDate } from '@/lib/formValidation';
+import { useToast } from '@/hooks/use-toast';
 
 export function AttendanceEntryPage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
@@ -16,6 +18,8 @@ export function AttendanceEntryPage() {
   const [search, setSearch] = useState('');
   const [onLeaveMap, setOnLeaveMap] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const { data: employeesData } = useQuery({
     queryKey: ['employees-for-attendance'],
@@ -76,9 +80,27 @@ export function AttendanceEntryPage() {
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    await attendanceAPI.create({ employeeId, date, status, notes });
-    setNotes('');
-    await refetch();
+    if (!isIsoDate(date)) {
+      setMessage('Select a valid attendance date.');
+      return;
+    }
+    if (!employeeId) {
+      setMessage('Select an employee.');
+      return;
+    }
+
+    setMessage(null);
+    setSaving(true);
+    try {
+      await attendanceAPI.create({ employeeId, date, status, notes: notes.trim() || null });
+      setNotes('');
+      await refetch();
+      toast({ title: 'Attendance saved' });
+    } catch (err) {
+      setMessage(getApiErrorMessage(err, 'Failed to save attendance.'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const toggleLeave = (id: string) => {
@@ -92,7 +114,21 @@ export function AttendanceEntryPage() {
   }, [employees, search]);
 
   const saveBulk = async () => {
+    if (!isIsoDate(date)) {
+      setMessage('Select a valid attendance date.');
+      return;
+    }
+    if (!departmentId) {
+      setMessage('Select a department.');
+      return;
+    }
+    if (!filteredEmployees.length) {
+      setMessage('No employees match the current department/search filter.');
+      return;
+    }
+
     setSaving(true);
+    setMessage(null);
     try {
       const promises = (filteredEmployees || []).map((emp: any) => {
         const wantLeave = !!onLeaveMap[emp.id];
@@ -103,10 +139,9 @@ export function AttendanceEntryPage() {
       });
       await Promise.all(promises);
       await refetch();
-      alert('Saved attendance for selected department');
+      toast({ title: 'Department attendance saved' });
     } catch (err) {
-      console.error(err);
-      alert('Error saving attendance');
+      setMessage(getApiErrorMessage(err, 'Error saving attendance.'));
     } finally {
       setSaving(false);
     }
@@ -121,6 +156,11 @@ export function AttendanceEntryPage() {
           </CardHeader>
           <CardContent>
             <form className="grid gap-4 md:grid-cols-5" onSubmit={submit}>
+              {message && (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 md:col-span-5">
+                  {message}
+                </p>
+              )}
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
 
               <select
@@ -167,7 +207,7 @@ export function AttendanceEntryPage() {
 
               <Input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
               {!departmentId ? (
-                <Button type="submit">Save</Button>
+                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save'}</Button>
               ) : (
                 <Button type="button" onClick={saveBulk} disabled={saving}>
                   {saving ? 'Saving...' : 'Save Department'}

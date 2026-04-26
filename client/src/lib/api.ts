@@ -2,6 +2,47 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002/api';
 
+type ApiFieldError = {
+  field?: string;
+  message?: string;
+};
+
+type ApiErrorBody = {
+  error?: string;
+  message?: string;
+  details?: ApiFieldError[];
+};
+
+export const getApiErrorMessage = (error: unknown, fallback = 'Something went wrong. Please try again.'): string => {
+  if (axios.isAxiosError<ApiErrorBody>(error)) {
+    const details = error.response?.data?.details;
+    if (details?.length) {
+      return details.map((detail) => detail.message || detail.field).filter(Boolean).join(' ');
+    }
+
+    return error.response?.data?.error || error.response?.data?.message || error.message || fallback;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
+export const getApiFieldErrors = (error: unknown): Record<string, string> => {
+  if (!axios.isAxiosError<ApiErrorBody>(error)) {
+    return {};
+  }
+
+  return (error.response?.data?.details || []).reduce<Record<string, string>>((errors, detail) => {
+    if (detail.field && detail.message) {
+      errors[detail.field] = detail.message;
+    }
+    return errors;
+  }, {});
+};
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
