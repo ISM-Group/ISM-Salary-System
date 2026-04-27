@@ -198,43 +198,6 @@ export const salaryHistoryAPI = {
   },
 };
 
-// Holidays API
-// PUBLIC_INTERFACE
-/**
- * Holidays API methods for managing public holidays and their types.
- */
-export const holidaysAPI = {
-  getAll: async (params?: { from?: string; to?: string }) => {
-    const response = await api.get('/holidays', { params });
-    return response.data;
-  },
-  getById: async (id: string) => {
-    const response = await api.get(`/holidays/${id}`);
-    return response.data;
-  },
-  create: async (data: { date: string; name: string; type: 'PAID' | 'UNPAID'; scope?: string; employeeIds?: string[] }) => {
-    const response = await api.post('/holidays', data);
-    return response.data;
-  },
-  update: async (id: string, data: Partial<{ date: string; name: string; type: 'PAID' | 'UNPAID'; scope: string; employeeIds?: string[] }>) => {
-    const response = await api.put(`/holidays/${id}`, data);
-    return response.data;
-  },
-  delete: async (id: string) => {
-    const response = await api.delete(`/holidays/${id}`);
-    return response.data;
-  },
-  /** Update employee assignments for a PER_EMPLOYEE holiday */
-  updateEmployees: async (id: string, employeeIds: string[]) => {
-    const response = await api.put(`/holidays/${id}/employees`, { employeeIds });
-    return response.data;
-  },
-  /** Get holidays applicable to a specific employee */
-  getByEmployee: async (employeeId: string, params?: { from?: string; to?: string }) => {
-    const response = await api.get(`/holidays/employee/${employeeId}`, { params });
-    return response.data;
-  },
-};
 
 // Attendance API
 // PUBLIC_INTERFACE
@@ -355,18 +318,55 @@ export const advanceSalariesAPI = {
   },
 };
 
-// Salary API
+// Salary Releases API
 // PUBLIC_INTERFACE
-/**
- * Salary calculation API methods for computing and viewing salary records.
- */
-export const salaryAPI = {
-  calculate: async (data: unknown) => {
-    const response = await api.post('/salary/calculate', data);
+export const salaryReleasesAPI = {
+  preview: async (data: { employeeId: string; periodStart: string; periodEnd: string; bonus?: number }) => {
+    const response = await api.post('/salary-releases/preview', data);
     return response.data;
   },
-  getHistory: async (params?: Record<string, unknown>) => {
-    const response = await api.get('/salary/history', { params });
+  batchPreview: async (data: { employeeIds: string[]; periodStart: string; periodEnd: string; bonus?: number }) => {
+    const response = await api.post('/salary-releases/batch-preview', data);
+    return response.data;
+  },
+  create: async (data: { employeeId: string; periodStart: string; periodEnd: string; bonus?: number; releasedAmount?: number; notes?: string }) => {
+    const response = await api.post('/salary-releases', data);
+    return response.data;
+  },
+  batchCreate: async (data: { employeeIds: string[]; periodStart: string; periodEnd: string; bonus?: number; notes?: string }) => {
+    const response = await api.post('/salary-releases/batch', data);
+    return response.data;
+  },
+  getAll: async (params?: Record<string, unknown>) => {
+    const response = await api.get('/salary-releases', { params });
+    return response.data;
+  },
+  getById: async (id: string) => {
+    const response = await api.get(`/salary-releases/${id}`);
+    return response.data;
+  },
+  getByEmployee: async (employeeId: string, params?: Record<string, unknown>) => {
+    const response = await api.get(`/salary-releases/employee/${employeeId}`, { params });
+    return response.data;
+  },
+  getEmployeeCalendar: async (employeeId: string, month: string) => {
+    const response = await api.get(`/salary-releases/employee/${employeeId}/calendar`, { params: { month } });
+    return response.data;
+  },
+  update: async (id: string, data: { releasedAmount?: number; bonus?: number; notes?: string }) => {
+    const response = await api.put(`/salary-releases/${id}`, data);
+    return response.data;
+  },
+  release: async (id: string) => {
+    const response = await api.put(`/salary-releases/${id}/release`);
+    return response.data;
+  },
+  batchRelease: async (data: { ids?: string[]; from?: string; to?: string }) => {
+    const response = await api.put('/salary-releases/batch-release', data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    const response = await api.delete(`/salary-releases/${id}`);
     return response.data;
   },
 };
@@ -447,42 +447,19 @@ export const auditLogsAPI = {
   },
 };
 
-// Daily Salary Releases API
+// Users API
 // PUBLIC_INTERFACE
-/**
- * Client API methods for daily salary release management.
- * Supports generating, viewing, releasing, and deleting daily salary payouts
- * for daily-wage employees. Also provides employee-specific history access.
- */
-export const dailyReleasesAPI = {
-  /** Generate daily release records for a given date */
-  generate: async (date: string) => {
-    const response = await api.post('/daily-releases/generate', { date });
+export const usersAPI = {
+  getAll: async () => {
+    const response = await api.get('/users');
     return response.data;
   },
-  /** Get all daily releases for a given date */
-  getAll: async (date: string) => {
-    const response = await api.get('/daily-releases', { params: { date } });
+  resetPassword: async (id: string, newPassword: string) => {
+    const response = await api.put(`/users/${id}/reset-password`, { newPassword });
     return response.data;
   },
-  /** Get daily release history for a specific employee */
-  getByEmployee: async (employeeId: string, params?: { from?: string; to?: string }) => {
-    const response = await api.get(`/daily-releases/employee/${employeeId}`, { params });
-    return response.data;
-  },
-  /** Mark a single daily release as RELEASED */
-  release: async (id: string) => {
-    const response = await api.put(`/daily-releases/${id}/release`);
-    return response.data;
-  },
-  /** Bulk release all pending daily salaries for a date */
-  releaseAll: async (date: string) => {
-    const response = await api.put('/daily-releases/release-all', { date });
-    return response.data;
-  },
-  /** Delete a PENDING daily release record */
-  deleteRelease: async (id: string) => {
-    const response = await api.delete(`/daily-releases/${id}`);
+  setStatus: async (id: string, isActive: boolean) => {
+    const response = await api.put(`/users/${id}/status`, { isActive });
     return response.data;
   },
 };
@@ -515,32 +492,5 @@ export const exportsAPI = {
   },
 };
 
-// Self-Service API
-// PUBLIC_INTERFACE
-/**
- * Self-service API methods for employees to access their own records.
- * Maps the authenticated user to their employee record.
- */
-export const selfServiceAPI = {
-  getProfile: async () => {
-    const response = await api.get('/self-service/profile');
-    return response.data;
-  },
-  getSalaryHistory: async () => {
-    const response = await api.get('/self-service/salary-history');
-    return response.data;
-  },
-  getAttendance: async (params?: { from?: string; to?: string }) => {
-    const response = await api.get('/self-service/attendance', { params });
-    return response.data;
-  },
-  getLoans: async () => {
-    const response = await api.get('/self-service/loans');
-    return response.data;
-  },
-  getPayslipUrl: (month: string) => {
-    return `${API_BASE_URL}/self-service/payslip?month=${month}`;
-  },
-};
 
 export default api;

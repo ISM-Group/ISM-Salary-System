@@ -2,28 +2,15 @@ import { z } from 'zod';
 
 // ─── Common reusable schemas ─────────────────────────────────────────
 
-/** UUID v4 format string */
 const uuidString = z.string().min(1, 'ID is required');
-
-/** Date string in YYYY-MM-DD format */
 const dateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format');
-
-/** Optional date string */
 const optionalDateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format').optional();
-
-/** Month string in YYYY-MM or YYYY-MM-DD format */
-const monthString = z.string().regex(/^\d{4}-\d{2}(-\d{2})?$/, 'Month must be in YYYY-MM or YYYY-MM-DD format');
-
-/** Positive decimal amount */
-const positiveAmount = z.number().positive('Amount must be positive');
-
-/** Treat blank form strings as empty optional values. */
 const blankToNull = (value: unknown) => (typeof value === 'string' && value.trim() === '' ? null : value);
+const positiveAmount = z.number().positive('Amount must be positive');
 
 // ─── Auth Schemas ────────────────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for user registration */
 export const registerSchema = z.object({
   username: z.string().min(3, 'Username must be at least 3 characters').max(100),
   password: z.string().min(8, 'Password must be at least 8 characters').max(128),
@@ -32,7 +19,6 @@ export const registerSchema = z.object({
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for user login */
 export const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
@@ -41,7 +27,6 @@ export const loginSchema = z.object({
 // ─── Employee Schemas ────────────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for creating an employee */
 export const createEmployeeSchema = z.object({
   employeeId: z.string().min(1, 'Employee ID is required').max(50),
   fullName: z.string().min(1, 'Full name is required').max(150),
@@ -60,7 +45,6 @@ export const createEmployeeSchema = z.object({
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for updating an employee */
 export const updateEmployeeSchema = z.object({
   employeeId: z.string().min(1).max(50).optional(),
   fullName: z.string().min(1).max(150).optional(),
@@ -81,14 +65,12 @@ export const updateEmployeeSchema = z.object({
 // ─── Department Schemas ──────────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for creating a department */
 export const createDepartmentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
   description: z.string().max(1000).nullable().optional(),
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for updating a department */
 export const updateDepartmentSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(1000).nullable().optional(),
@@ -97,7 +79,6 @@ export const updateDepartmentSchema = z.object({
 // ─── Role Schemas ────────────────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for creating a role */
 export const createRoleSchema = z.object({
   name: z.string().min(1, 'Role name is required').max(120),
   level: z.string().max(50).nullable().optional(),
@@ -107,7 +88,6 @@ export const createRoleSchema = z.object({
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for updating a role */
 export const updateRoleSchema = z.object({
   name: z.string().min(1).max(120).optional(),
   level: z.string().max(50).nullable().optional(),
@@ -118,7 +98,6 @@ export const updateRoleSchema = z.object({
 // ─── Attendance Schemas ──────────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for creating/upserting attendance */
 export const createAttendanceSchema = z.object({
   employeeId: uuidString,
   date: dateString,
@@ -126,19 +105,19 @@ export const createAttendanceSchema = z.object({
     errorMap: () => ({ message: 'Status must be PRESENT or ABSENT' }),
   }),
   notes: z.string().max(1000).nullable().optional(),
+  roleId: z.preprocess(blankToNull, z.string().nullable().optional()),
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for updating attendance */
 export const updateAttendanceSchema = z.object({
   status: z.enum(['PRESENT', 'ABSENT']).optional(),
   notes: z.string().max(1000).nullable().optional(),
+  roleId: z.preprocess(blankToNull, z.string().nullable().optional()),
 });
 
 // ─── Loan Schemas ────────────────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for creating a loan */
 export const createLoanSchema = z.object({
   employeeId: uuidString,
   loanAmount: positiveAmount,
@@ -150,7 +129,6 @@ export const createLoanSchema = z.object({
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for updating a loan */
 export const updateLoanSchema = z.object({
   status: z.enum(['ACTIVE', 'PAID', 'CANCELLED']).optional(),
   remainingBalance: z.number().min(0).optional(),
@@ -159,13 +137,11 @@ export const updateLoanSchema = z.object({
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for settling a loan */
 export const settleLoanSchema = z.object({
   notes: z.string().max(1000).optional(),
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for extending a loan */
 export const extendLoanSchema = z.object({
   numInstallments: z.number().int().min(1).max(60, 'Cannot extend more than 60 installments'),
   installmentAmount: z.number().positive().optional(),
@@ -173,7 +149,6 @@ export const extendLoanSchema = z.object({
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for updating a loan installment */
 export const updateInstallmentSchema = z.object({
   amount: z.number().positive().optional(),
   status: z.enum(['PENDING', 'PAID', 'OVERDUE']).optional(),
@@ -182,7 +157,6 @@ export const updateInstallmentSchema = z.object({
 // ─── Advance Salary Schemas ─────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for creating an advance salary */
 export const createAdvanceSalarySchema = z.object({
   employeeId: uuidString,
   amount: z.union([z.string().min(1), z.number().positive()]),
@@ -192,71 +166,59 @@ export const createAdvanceSalarySchema = z.object({
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for updating advance salary status */
 export const updateAdvanceSalaryStatusSchema = z.object({
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED'], {
     errorMap: () => ({ message: 'Status must be PENDING, APPROVED, or REJECTED' }),
   }),
 });
 
-// ─── Salary Schemas ──────────────────────────────────────────────────
+// ─── Salary Release Schemas ──────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for salary calculation */
-export const calculateSalarySchema = z.object({
+export const previewSalaryReleaseSchema = z.object({
   employeeId: uuidString,
-  month: monthString,
+  periodStart: dateString,
+  periodEnd: dateString,
   bonus: z.number().min(0).optional().default(0),
 });
 
-// ─── Holiday Schemas ─────────────────────────────────────────────────
-
 // PUBLIC_INTERFACE
-/** Validation schema for creating a holiday */
-export const createHolidaySchema = z.object({
-  date: dateString,
-  name: z.string().min(1, 'Holiday name is required').max(255),
-  type: z.enum(['PAID', 'UNPAID'], {
-    errorMap: () => ({ message: 'Type must be PAID or UNPAID' }),
-  }),
-  scope: z.enum(['GLOBAL', 'PER_EMPLOYEE']).optional().default('GLOBAL'),
-  employeeIds: z.array(z.string().min(1)).optional(),
+export const batchPreviewSalaryReleaseSchema = z.object({
+  employeeIds: z.array(uuidString).min(1, 'At least one employee is required'),
+  periodStart: dateString,
+  periodEnd: dateString,
+  bonus: z.number().min(0).optional().default(0),
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for updating a holiday */
-export const updateHolidaySchema = z.object({
-  date: optionalDateString,
-  name: z.string().min(1).max(255).optional(),
-  type: z.enum(['PAID', 'UNPAID']).optional(),
-  scope: z.enum(['GLOBAL', 'PER_EMPLOYEE']).optional(),
-  employeeIds: z.array(z.string().min(1)).optional(),
+export const createSalaryReleaseSchema = z.object({
+  employeeId: uuidString,
+  periodStart: dateString,
+  periodEnd: dateString,
+  bonus: z.number().min(0).optional().default(0),
+  releasedAmount: z.number().min(0).optional(),
+  notes: z.string().max(2000).nullable().optional(),
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for updating holiday employees */
-export const updateHolidayEmployeesSchema = z.object({
-  employeeIds: z.array(z.string().min(1)).min(1, 'At least one employee is required'),
-});
-
-// ─── Daily Salary Release Schemas ────────────────────────────────────
-
-// PUBLIC_INTERFACE
-/** Validation schema for generating daily releases */
-export const generateDailyReleasesSchema = z.object({
-  date: dateString,
+export const batchCreateSalaryReleaseSchema = z.object({
+  employeeIds: z.array(uuidString).min(1),
+  periodStart: dateString,
+  periodEnd: dateString,
+  bonus: z.number().min(0).optional().default(0),
+  notes: z.string().max(2000).nullable().optional(),
 });
 
 // PUBLIC_INTERFACE
-/** Validation schema for bulk releasing daily salaries */
-export const releaseAllDailySalariesSchema = z.object({
-  date: dateString,
+export const updateSalaryReleaseSchema = z.object({
+  releasedAmount: z.number().min(0).optional(),
+  bonus: z.number().min(0).optional(),
+  notes: z.string().max(2000).nullable().optional(),
 });
 
 // ─── Salary History Schemas ──────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for creating a salary history entry */
 export const createSalaryHistorySchema = z.object({
   effectiveFrom: dateString,
   salaryType: z.enum(['FIXED', 'DAILY_WAGE']),
@@ -265,10 +227,21 @@ export const createSalaryHistorySchema = z.object({
   notes: z.string().max(1000).nullable().optional(),
 });
 
+// ─── User Management Schemas ─────────────────────────────────────────
+
+// PUBLIC_INTERFACE
+export const resetPasswordSchema = z.object({
+  newPassword: z.string().min(8, 'Password must be at least 8 characters').max(128),
+});
+
+// PUBLIC_INTERFACE
+export const setUserStatusSchema = z.object({
+  isActive: z.boolean(),
+});
+
 // ─── Audit Log Schemas ───────────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Validation schema for verifying audit log passkey */
 export const verifyPasskeySchema = z.object({
   passkey: z.string().min(1, 'Passkey is required'),
 });
@@ -276,7 +249,6 @@ export const verifyPasskeySchema = z.object({
 // ─── Pagination Query Schema ─────────────────────────────────────────
 
 // PUBLIC_INTERFACE
-/** Shared pagination query params schema */
 export const paginationQuerySchema = z.object({
   page: z.string().optional().default('1'),
   limit: z.string().optional().default('50'),

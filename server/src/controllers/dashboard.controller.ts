@@ -15,31 +15,28 @@ export const getStats = async (req: AuthRequest, res: Response) => {
        FROM loans WHERE status = 'ACTIVE'`
     );
 
-    // Get advances for current month (advance_salaries doesn't have status, so get all for current month)
     const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
     const pendingAdvances = await queryOne<{ count: number; total: number }>(
-      `SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total 
-       FROM advance_salaries 
-       WHERE DATE_FORMAT(advance_date, '%Y-%m') = ?`,
+      `SELECT COUNT(*) as count, COALESCE(SUM(amount), 0) as total
+       FROM advance_salaries
+       WHERE status = 'PENDING' AND DATE_FORMAT(advance_date, '%Y-%m') = ?`,
       [currentMonth]
     );
 
-    // Get monthly salary total (current month) - use month column and total_salary
     const monthlySalary = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(total_salary), 0) as total 
-       FROM salary_calculations 
-       WHERE DATE_FORMAT(month, '%Y-%m') = ?`,
+      `SELECT COALESCE(SUM(released_amount), 0) as total
+       FROM salary_releases
+       WHERE status = 'RELEASED' AND DATE_FORMAT(period_start, '%Y-%m') = ?`,
       [currentMonth]
     );
 
-    // Get previous month salary for trend
     const previousMonth = new Date();
     previousMonth.setMonth(previousMonth.getMonth() - 1);
     const prevMonthStr = previousMonth.toISOString().slice(0, 7);
     const previousSalary = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(total_salary), 0) as total 
-       FROM salary_calculations 
-       WHERE DATE_FORMAT(month, '%Y-%m') = ?`,
+      `SELECT COALESCE(SUM(released_amount), 0) as total
+       FROM salary_releases
+       WHERE status = 'RELEASED' AND DATE_FORMAT(period_start, '%Y-%m') = ?`,
       [prevMonthStr]
     );
 
@@ -74,15 +71,15 @@ export const getSalaryTrends = async (req: AuthRequest, res: Response) => {
   try {
     const months = parseInt(req.query.months as string, 10) || 6;
     
-    // Get salary data for the last N months - use month column and total_salary
     const sql = `
-      SELECT 
-        DATE_FORMAT(month, '%Y-%m') as month,
-        SUM(total_salary) as total,
+      SELECT
+        DATE_FORMAT(period_start, '%Y-%m') as month,
+        SUM(released_amount) as total,
         COUNT(*) as count
-      FROM salary_calculations
-      WHERE month >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-      GROUP BY DATE_FORMAT(month, '%Y-%m')
+      FROM salary_releases
+      WHERE status = 'RELEASED'
+        AND period_start >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+      GROUP BY DATE_FORMAT(period_start, '%Y-%m')
       ORDER BY month ASC
     `;
 

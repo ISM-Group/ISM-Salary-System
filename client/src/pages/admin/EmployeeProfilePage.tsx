@@ -1,59 +1,132 @@
+import { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import {
-  ArrowLeft,
-  Calendar,
-  DollarSign,
-  FileText,
-  TrendingUp,
-  User,
-  Phone,
-  MapPin,
-  Edit,
-  Plus,
-  ExternalLink,
-  Loader2,
+  ArrowLeft, Edit, Loader2, Calendar, DollarSign, TrendingUp, CreditCard,
+  Wallet, Plus, CheckCircle, Trash2, ExternalLink,
 } from 'lucide-react';
-import { employeesAPI } from '@/lib/api';
+import { employeesAPI, salaryReleasesAPI, salaryHistoryAPI, loansAPI, advanceSalariesAPI, exportsAPI, getApiErrorMessage } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+
+type Tab = 'overview' | 'calendar' | 'releases' | 'increments' | 'loans' | 'advances';
+
+const TABS: { key: Tab; label: string; icon: any }[] = [
+  { key: 'overview', label: 'Overview', icon: null },
+  { key: 'calendar', label: 'Calendar', icon: Calendar },
+  { key: 'releases', label: 'Releases', icon: DollarSign },
+  { key: 'increments', label: 'Increments', icon: TrendingUp },
+  { key: 'loans', label: 'Loans', icon: CreditCard },
+  { key: 'advances', label: 'Advances', icon: Wallet },
+];
+
+function calendarMonthDays(year: number, month: number): (string | null)[] {
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const offset = firstDay === 0 ? 6 : firstDay - 1; // Mon=0
+  const cells: (string | null)[] = Array(offset).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    cells.push(`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+  }
+  return cells;
+}
 
 export function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [tab, setTab] = useState<Tab>('overview');
 
-  const { data: profileData, isLoading, refetch } = useQuery({
+  // Calendar state
+  const now = new Date();
+  const [calYear, setCalYear] = useState(now.getFullYear());
+  const [calMonth, setCalMonth] = useState(now.getMonth() + 1);
+
+  // Increment modal
+  const [showIncrementModal, setShowIncrementModal] = useState(false);
+  const [incEffectiveFrom, setIncEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
+  const [incSalaryType, setIncSalaryType] = useState<'FIXED' | 'DAILY_WAGE'>('DAILY_WAGE');
+  const [incBaseSalary, setIncBaseSalary] = useState('');
+  const [incReason, setIncReason] = useState('');
+  const [incNotes, setIncNotes] = useState('');
+  const [incError, setIncError] = useState('');
+
+  const { data: profileData, isLoading } = useQuery({
     queryKey: ['employee-profile', id],
     queryFn: async () => {
-      const response = await employeesAPI.getProfile(id!);
-      return response.data;
+      const r = await employeesAPI.getProfile(id!);
+      return r.data;
     },
     enabled: !!id,
   });
 
+  const { data: releasesRes } = useQuery({
+    queryKey: ['employee-releases', id],
+    queryFn: () => salaryReleasesAPI.getByEmployee(id!),
+    enabled: tab === 'releases',
+  });
+
+  const { data: incRes } = useQuery({
+    queryKey: ['employee-salary-history', id],
+    queryFn: () => salaryHistoryAPI.getByEmployee(id!),
+    enabled: tab === 'increments',
+  });
+
+  const { data: calendarRes } = useQuery({
+    queryKey: ['employee-calendar', id, calYear, calMonth],
+    queryFn: () =>
+      salaryReleasesAPI.getEmployeeCalendar(id!, `${calYear}-${String(calMonth).padStart(2, '0')}`),
+    enabled: tab === 'calendar',
+  });
+
+  const addIncrementMutation = useMutation({
+    mutationFn: () =>
+      salaryHistoryAPI.create(id!, {
+        effectiveFrom: incEffectiveFrom,
+        salaryType: incSalaryType,
+        baseSalary: Number(incBaseSalary),
+        reason: incReason,
+        notes: incNotes || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee-salary-history', id] });
+      setShowIncrementModal(false);
+      setIncBaseSalary(''); setIncReason(''); setIncNotes(''); setIncError('');
+      toast({ title: 'Increment added' });
+    },
+    onError: (err) => setIncError(getApiErrorMessage(err, 'Failed to add increment')),
+  });
+
+  const releaseMutation = useMutation({
+    mutationFn: (releaseId: string) => salaryReleasesAPI.release(releaseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee-releases', id] });
+      toast({ title: 'Payment released' });
+    },
+    onError: (err) => toast({ title: getApiErrorMessage(err), variant: 'destructive' }),
+  });
+
+  const deleteReleaseMutation = useMutation({
+    mutationFn: (releaseId: string) => salaryReleasesAPI.delete(releaseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employee-releases', id] });
+      toast({ title: 'Release deleted' });
+    },
+    onError: (err) => toast({ title: getApiErrorMessage(err), variant: 'destructive' }),
+  });
 
   if (isLoading) {
     return (
-      <MainLayout title="Employee Profile" description="Loading employee details...">
+      <MainLayout title="Employee Profile" description="Loading...">
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
         </div>
       </MainLayout>
     );
@@ -61,352 +134,428 @@ export function EmployeeProfilePage() {
 
   if (!profileData) {
     return (
-      <MainLayout title="Employee Profile" description="Employee not found">
+      <MainLayout title="Employee Profile" description="Not found">
         <div className="text-center py-8">
-          <p className="text-muted-foreground">Employee not found</p>
-          <Button onClick={() => navigate('/admin/employees')} className="mt-4">
-            Back to Employees
-          </Button>
+          <p className="text-gray-500">Employee not found</p>
+          <Button onClick={() => navigate('/admin/employees')} className="mt-4">Back to Employees</Button>
         </div>
       </MainLayout>
     );
   }
 
-  const { employee, salarySettings, salaryPromotions, salaryHistory, loans, advances, attendanceSummary } = profileData;
+  const { employee, salaryPromotions, loans, advances, attendanceSummary } = profileData;
+
+  // Build calendar data
+  const calData = calendarRes?.data;
+  const attendanceByDate: Record<string, any> = {};
+  (calData?.attendance || []).forEach((a: any) => { attendanceByDate[a.date] = a; });
+  const calDays = calendarMonthDays(calYear, calMonth);
+  const monthLabel = new Date(calYear, calMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const prevMonth = () => { if (calMonth === 1) { setCalYear((y) => y - 1); setCalMonth(12); } else setCalMonth((m) => m - 1); };
+  const nextMonth = () => { if (calMonth === 12) { setCalYear((y) => y + 1); setCalMonth(1); } else setCalMonth((m) => m + 1); };
+
+  const releases: any[] = releasesRes?.data || [];
+  const increments: any[] = incRes?.data || [];
+
+  const statusBadge = (s: string) =>
+    s === 'RELEASED'
+      ? <Badge variant="outline" className="border-green-300 text-green-700 bg-green-50">Released</Badge>
+      : <Badge variant="outline" className="border-yellow-300 text-yellow-700 bg-yellow-50">Draft</Badge>;
 
   return (
-    <MainLayout title="Employee Profile" description={`Viewing profile for ${employee.fullName}`}>
-      <div className="space-y-6">
-        {/* Back Button */}
-        <Button variant="ghost" onClick={() => navigate('/admin/employees')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Employees
-        </Button>
-
-        {/* Employee Header Card */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-start justify-between">
-              <div>
-                <CardTitle className="text-2xl">{employee.fullName}</CardTitle>
-                <CardDescription className="mt-1">
-                  {employee.employeeId} • {employee.department.name}
-                  {employee.role && ` • ${employee.role.name}`}
-                </CardDescription>
-              </div>
-              <div className="flex gap-2">
-                <Link to={`/admin/employees/${id}/edit`}>
-                  <Button variant="outline">
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit Profile
-                  </Button>
-                </Link>
-              </div>
+    <MainLayout title="Employee Profile" description={`${employee.fullName} — ${employee.department?.name || ''}`}>
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/admin/employees')}>
+              <ArrowLeft className="h-4 w-4 mr-1" /> Back
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold">{employee.fullName}</h1>
+              <p className="text-sm text-gray-500">{employee.employeeId} · {employee.department?.name} · {employee.role?.name || 'No role'}</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <div className="flex items-start gap-3">
-                <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Phone</p>
-                  <p className="text-sm text-muted-foreground">{employee.phone || 'Not provided'}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Address</p>
-                  <p className="text-sm text-muted-foreground">
-                    {employee.address?.line1
-                      ? `${employee.address.line1}${employee.address.city ? `, ${employee.address.city}` : ''}`
-                      : 'Not provided'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Joined Date</p>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(employee.hireDate).toLocaleDateString()}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Badge variant={employee.isActive ? 'default' : 'secondary'}>
-                  {employee.isActive ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={employee.isActive ? 'default' : 'secondary'}>{employee.isActive ? 'Active' : 'Inactive'}</Badge>
+            <Badge variant="outline" className={employee.salaryType === 'FIXED' ? 'border-purple-300 text-purple-700' : 'border-blue-300 text-blue-700'}>
+              {employee.salaryType}
+            </Badge>
+            <Link to={`/admin/employees/${id}/edit`}>
+              <Button variant="outline" size="sm"><Edit className="h-3.5 w-3.5 mr-1" /> Edit</Button>
+            </Link>
+          </div>
+        </div>
 
-        {/* Salary Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Salary Information
-            </CardTitle>
-            <CardDescription>All salaries are calculated on a daily basis</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-sm text-muted-foreground">
-                Employee salary is calculated based on daily attendance and the role worked each day. 
-                Daily wage rates are set per role in the Roles management section.
-              </p>
-              {employee.role?.dailyWage && (
-                <div className="mt-3 pt-3 border-t">
-                  <p className="text-sm">
-                    <span className="font-medium">Default Role:</span> {employee.role.name} - 
-                    <span className="font-semibold ml-1">{formatCurrency(employee.role.dailyWage)}/day</span>
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Tab bar */}
+        <div className="flex border-b">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                tab === t.key
+                  ? 'border-indigo-600 text-indigo-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-        {/* Salary Promotions History */}
-        {salaryPromotions && salaryPromotions.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5" />
-                Salary Promotions History
-              </CardTitle>
-              <CardDescription>Timeline of salary changes and promotions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Effective From</TableHead>
-                    <TableHead>Salary Type</TableHead>
-                    <TableHead>Base Salary</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Changed By</TableHead>
-                    <TableHead>Date</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {salaryPromotions.map((promotion: any) => (
-                    <TableRow key={promotion.id}>
-                      <TableCell>{new Date(promotion.effectiveFrom).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">Daily Wage</Badge>
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {formatCurrency(promotion.baseSalary)}/day
-                      </TableCell>
-                      <TableCell>{promotion.reason}</TableCell>
-                      <TableCell>{promotion.changedBy?.fullName || promotion.changedBy?.username || 'N/A'}</TableCell>
-                      <TableCell>{new Date(promotion.changedAt).toLocaleDateString()}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Salary History (Payouts) */}
-        {salaryHistory && salaryHistory.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Salary Payout History
-              </CardTitle>
-              <CardDescription>Monthly salary calculations and payouts</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Month</TableHead>
-                    <TableHead>Base/Daily Wage</TableHead>
-                    <TableHead>Bonus</TableHead>
-                    <TableHead>Advances</TableHead>
-                    <TableHead>Loans</TableHead>
-                    <TableHead>Net Salary</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {salaryHistory.map((salary: any) => (
-                    <TableRow key={salary.id}>
-                      <TableCell>{new Date(salary.month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</TableCell>
-                      <TableCell>
-                        {salary.baseSalary !== null
-                          ? formatCurrency(salary.baseSalary)
-                          : formatCurrency(salary.dailyWageTotal)}
-                      </TableCell>
-                      <TableCell>{formatCurrency(salary.bonus)}</TableCell>
-                      <TableCell className="text-red-600">-{formatCurrency(salary.advanceDeductions)}</TableCell>
-                      <TableCell className="text-red-600">-{formatCurrency(salary.loanDeductions)}</TableCell>
-                      <TableCell className="font-semibold">{formatCurrency(salary.totalSalary)}</TableCell>
-                      <TableCell>
-                        <Badge variant={salary.status === 'FINALIZED' ? 'default' : 'secondary'}>
-                          {salary.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Loans */}
-        {loans && loans.length > 0 && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Loans
-                  </CardTitle>
-                  <CardDescription>Active loans and repayment schedule</CardDescription>
-                </div>
-                <Link to="/admin/loans">
-                  <Button variant="outline">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Loan
-                  </Button>
-                </Link>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {loans.map((loan: any) => (
-                  <div key={loan.id} className="border rounded-lg p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-medium">Loan Amount: {formatCurrency(loan.loanAmount)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Remaining Balance: <span className="font-medium">{formatCurrency(loan.remainingBalance)}</span>
-                        </p>
-                      </div>
-                      <Badge variant={loan.status === 'ACTIVE' ? 'default' : 'secondary'}>
-                        {loan.status}
-                      </Badge>
-                    </div>
-                    {loan.installments && loan.installments.length > 0 && (
-                      <div className="mt-4">
-                        <p className="text-sm font-medium mb-2">Installments:</p>
-                        <div className="space-y-1">
-                          {loan.installments.slice(0, 5).map((inst: any) => (
-                            <div key={inst.id} className="flex items-center justify-between text-sm">
-                              <span>
-                                #{inst.installmentNumber} - {new Date(inst.dueMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                              </span>
-                              <span className={inst.status === 'PAID' ? 'text-green-600' : 'text-muted-foreground'}>
-                                {formatCurrency(inst.amount)} ({inst.status})
-                              </span>
-                            </div>
-                          ))}
-                          {loan.installments.length > 5 && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              +{loan.installments.length - 5} more installments
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
+        {/* Tab: Overview */}
+        {tab === 'overview' && (
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Personal Details</CardTitle></CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{employee.email || '-'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{employee.phone || '-'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Hire Date</span><span>{new Date(employee.hireDate).toLocaleDateString()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">City</span><span>{employee.address?.city || '-'}</span></div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Salary Configuration</CardTitle></CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-gray-500">Type</span><Badge variant="outline">{employee.salaryType}</Badge></div>
+                <div className="flex justify-between"><span className="text-gray-500">Base Rate</span><span className="font-mono font-medium">{formatCurrency(employee.baseSalary || employee.role?.dailyWage || 0)}{employee.salaryType === 'DAILY_WAGE' ? '/day' : '/month'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Primary Role</span><span>{employee.role?.name || '-'}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Department</span><span>{employee.department?.name || '-'}</span></div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Attendance (Last 3 Months)</CardTitle></CardHeader>
+              <CardContent className="text-sm">
+                <div className="grid grid-cols-2 gap-4 mt-1">
+                  <div className="rounded-lg bg-green-50 p-3 text-center">
+                    <p className="text-xs text-gray-500">Present</p>
+                    <p className="text-2xl font-bold text-green-700">{attendanceSummary?.presentDays ?? 0}</p>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Advances */}
-        {advances && advances.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Advance Salaries
-              </CardTitle>
-              <CardDescription>Advance salary records</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Slip</TableHead>
-                    <TableHead>Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {advances.map((advance: any) => (
-                    <TableRow key={advance.id}>
-                      <TableCell>{new Date(advance.advanceDate).toLocaleDateString()}</TableCell>
-                      <TableCell className="font-medium">{formatCurrency(advance.amount)}</TableCell>
-                      <TableCell>
-                        {advance.slipPhotoUrl && (
-                          <a
-                            href={advance.slipPhotoUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-accent hover:underline flex items-center gap-1"
-                          >
-                            View Slip
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{advance.notes || '-'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Attendance Summary */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Attendance Summary
-                </CardTitle>
-                <CardDescription>Last 3 months attendance statistics</CardDescription>
-              </div>
-              <Link to={`/admin/employees/${id}/attendance/calendar`}>
-                <Button variant="outline">
-                  View Calendar
-                  <ExternalLink className="ml-2 h-4 w-4" />
+                  <div className="rounded-lg bg-red-50 p-3 text-center">
+                    <p className="text-xs text-gray-500">Absent</p>
+                    <p className="text-2xl font-bold text-red-600">{attendanceSummary?.absentDays ?? 0}</p>
+                  </div>
+                </div>
+                <div className="mt-3 text-right">
+                  <Link to={`/admin/employees/${id}/attendance/calendar`} className="text-xs text-indigo-600 hover:underline flex items-center gap-1 justify-end">
+                    Full calendar <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Quick Links</CardTitle></CardHeader>
+              <CardContent className="space-y-2">
+                <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setTab('releases')}>
+                  <DollarSign className="h-4 w-4 mr-2" /> View Salary Releases
                 </Button>
+                <Button variant="outline" size="sm" className="w-full justify-start" onClick={() => setTab('increments')}>
+                  <TrendingUp className="h-4 w-4 mr-2" /> Manage Increments
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start"
+                  onClick={() => {
+                    const token = localStorage.getItem('token');
+                    const month = new Date().toISOString().slice(0, 7);
+                    const url = exportsAPI.getPayslipUrl(id!, month) + `&token=${token}`;
+                    window.open(url, '_blank');
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" /> Open Latest Payslip
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Tab: Calendar */}
+        {tab === 'calendar' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" onClick={prevMonth}>←</Button>
+              <span className="font-medium">{monthLabel}</span>
+              <Button variant="outline" size="sm" onClick={nextMonth}>→</Button>
+            </div>
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-gray-400 mb-1">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+                <div key={d}>{d}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {calDays.map((date, i) => {
+                if (!date) return <div key={i} />;
+                const att = attendanceByDate[date];
+                const day = parseInt(date.slice(8), 10);
+                let bg = 'bg-gray-50 text-gray-400';
+                if (att?.status === 'PRESENT') bg = 'bg-green-100 text-green-800';
+                if (att?.status === 'ABSENT') bg = 'bg-red-100 text-red-700';
+                return (
+                  <div
+                    key={date}
+                    className={`${bg} rounded-lg p-2 text-center text-xs min-h-[56px] flex flex-col items-center justify-start gap-1`}
+                    title={att ? `${att.status}${att.roleName ? ` — ${att.roleName}` : ''}` : 'No record'}
+                  >
+                    <span className="font-medium">{day}</span>
+                    {att?.roleName && <span className="text-[10px] truncate max-w-full opacity-75">{att.roleName}</span>}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Release bars */}
+            {(calData?.releases || []).length > 0 && (
+              <Card>
+                <CardHeader><CardTitle className="text-sm">Releases in {monthLabel}</CardTitle></CardHeader>
+                <CardContent>
+                  {calData.releases.map((r: any) => (
+                    <div key={r.id} className="flex items-center justify-between py-1.5 border-b last:border-0 text-sm">
+                      <div>
+                        <Badge variant="outline" className="text-xs mr-2">{r.releaseType}</Badge>
+                        {r.periodStart} → {r.periodEnd}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-medium">{formatCurrency(r.releasedAmount)}</span>
+                        {statusBadge(r.status)}
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Releases */}
+        {tab === 'releases' && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <h2 className="text-sm font-medium text-gray-700">Salary Release History</h2>
+              <Link to="/admin/salary-releases">
+                <Button size="sm" variant="outline"><Plus className="h-3.5 w-3.5 mr-1" /> New Release</Button>
               </Link>
             </div>
-          </CardHeader>
-          <CardContent>
-            {attendanceSummary && (
-              <div className="grid gap-4 md:grid-cols-2">
-                <div>
-                  <p className="text-sm text-muted-foreground">Present Days</p>
-                  <p className="text-2xl font-bold">{attendanceSummary.presentDays}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Absent Days</p>
-                  <p className="text-2xl font-bold">{attendanceSummary.absentDays}</p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Period</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Working Days</TableHead>
+                  <TableHead>Gross</TableHead>
+                  <TableHead>Released</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {releases.length === 0 && (
+                  <TableRow><TableCell colSpan={7} className="text-center py-6 text-gray-400">No releases yet</TableCell></TableRow>
+                )}
+                {releases.map((r: any) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="text-sm">{r.periodStart} → {r.periodEnd}</TableCell>
+                    <TableCell><Badge variant="outline" className="text-xs">{r.releaseType}</Badge></TableCell>
+                    <TableCell>{r.workingDays}</TableCell>
+                    <TableCell className="font-mono">{formatCurrency(r.grossAmount)}</TableCell>
+                    <TableCell className="font-mono font-semibold">{formatCurrency(r.releasedAmount)}</TableCell>
+                    <TableCell>{statusBadge(r.status)}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        {r.status === 'DRAFT' && (
+                          <>
+                            <Button size="sm" variant="ghost" className="text-green-600" onClick={() => releaseMutation.mutate(r.id)}>
+                              <CheckCircle className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-red-500" onClick={() => deleteReleaseMutation.mutate(r.id)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* Tab: Increments */}
+        {tab === 'increments' && (
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <h2 className="text-sm font-medium text-gray-700">Salary Increment History</h2>
+              <Button size="sm" onClick={() => setShowIncrementModal(true)}>
+                <Plus className="h-3.5 w-3.5 mr-1" /> Add Increment
+              </Button>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Effective From</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Rate</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Changed By</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {increments.length === 0 && (
+                  <TableRow><TableCell colSpan={5} className="text-center py-6 text-gray-400">No increments yet</TableCell></TableRow>
+                )}
+                {increments.map((inc: any) => (
+                  <TableRow key={inc.id}>
+                    <TableCell>{new Date(inc.effectiveFrom).toLocaleDateString()}</TableCell>
+                    <TableCell><Badge variant="outline" className="text-xs">{inc.salaryType}</Badge></TableCell>
+                    <TableCell className="font-mono font-medium">{formatCurrency(inc.baseSalary)}{inc.salaryType === 'DAILY_WAGE' ? '/day' : '/month'}</TableCell>
+                    <TableCell className="text-sm">{inc.reason}</TableCell>
+                    <TableCell className="text-sm text-gray-500">{inc.changedBy?.fullName || inc.changedBy?.username || '-'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {/* Tab: Loans */}
+        {tab === 'loans' && (
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <h2 className="text-sm font-medium text-gray-700">Loans</h2>
+              <Link to="/admin/loans"><Button size="sm" variant="outline"><Plus className="h-3.5 w-3.5 mr-1" /> Add Loan</Button></Link>
+            </div>
+            {(!loans || loans.length === 0) && <p className="text-sm text-gray-400 py-4">No loans on record</p>}
+            {(loans || []).map((loan: any) => (
+              <Card key={loan.id}>
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-medium">{formatCurrency(loan.loanAmount)} — {loan.repaymentMode}</p>
+                      <p className="text-sm text-gray-500">Balance: <span className="font-mono font-medium">{formatCurrency(loan.remainingBalance)}</span></p>
+                    </div>
+                    <Badge variant={loan.status === 'ACTIVE' ? 'default' : 'secondary'}>{loan.status}</Badge>
+                  </div>
+                  {loan.installments?.slice(0, 5).map((inst: any) => (
+                    <div key={inst.id} className="flex justify-between text-xs py-1 border-t">
+                      <span>#{inst.installmentNumber} {new Date(inst.dueMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+                      <span className={inst.status === 'PAID' ? 'text-green-600' : 'text-gray-500'}>
+                        {formatCurrency(inst.amount)} ({inst.status})
+                      </span>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Tab: Advances */}
+        {tab === 'advances' && (
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <h2 className="text-sm font-medium text-gray-700">Advance Salaries</h2>
+              <Link to="/admin/advance-salaries"><Button size="sm" variant="outline"><Plus className="h-3.5 w-3.5 mr-1" /> Add Advance</Button></Link>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Slip</TableHead>
+                  <TableHead>Notes</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(!advances || advances.length === 0) && (
+                  <TableRow><TableCell colSpan={5} className="text-center py-6 text-gray-400">No advances on record</TableCell></TableRow>
+                )}
+                {(advances || []).map((adv: any) => (
+                  <TableRow key={adv.id}>
+                    <TableCell>{new Date(adv.advanceDate).toLocaleDateString()}</TableCell>
+                    <TableCell className="font-mono font-medium">{formatCurrency(adv.amount)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={
+                        adv.status === 'APPROVED' ? 'text-green-700 border-green-300' :
+                        adv.status === 'REJECTED' ? 'text-red-600 border-red-300' : 'text-yellow-700 border-yellow-300'
+                      }>{adv.status}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {adv.slipPhotoUrl && (
+                        <a href={adv.slipPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline flex items-center gap-1 text-xs">
+                          View <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">{adv.notes || '-'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
+
+      {/* Add Increment Modal */}
+      {showIncrementModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold mb-4">Add Salary Increment</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Effective From</label>
+                <Input type="date" value={incEffectiveFrom} onChange={(e) => setIncEffectiveFrom(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Salary Type</label>
+                <select
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  value={incSalaryType}
+                  onChange={(e) => setIncSalaryType(e.target.value as 'FIXED' | 'DAILY_WAGE')}
+                >
+                  <option value="DAILY_WAGE">Daily Wage</option>
+                  <option value="FIXED">Fixed Monthly</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">
+                  New Rate ({incSalaryType === 'DAILY_WAGE' ? 'per day' : 'per month'})
+                </label>
+                <Input type="number" min="0" step="0.01" value={incBaseSalary} onChange={(e) => setIncBaseSalary(e.target.value)} placeholder="e.g. 2000" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Reason</label>
+                <Input value={incReason} onChange={(e) => setIncReason(e.target.value)} placeholder="e.g. Annual increment, promotion" />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-1 block">Notes (optional)</label>
+                <Input value={incNotes} onChange={(e) => setIncNotes(e.target.value)} placeholder="Optional notes" />
+              </div>
+              {incError && <p className="text-sm text-red-600">{incError}</p>}
+            </div>
+            <div className="flex gap-2 mt-5">
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  setIncError('');
+                  if (!incBaseSalary || Number(incBaseSalary) <= 0) { setIncError('Enter a valid rate'); return; }
+                  if (!incReason) { setIncError('Reason is required'); return; }
+                  addIncrementMutation.mutate();
+                }}
+                disabled={addIncrementMutation.isPending}
+              >
+                {addIncrementMutation.isPending ? 'Adding...' : 'Add Increment'}
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={() => { setShowIncrementModal(false); setIncError(''); }}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }

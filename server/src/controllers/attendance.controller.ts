@@ -5,25 +5,27 @@ import { AuthRequest } from '../types';
 export const getAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
   const { employeeId, from, to } = req.query as Record<string, string | undefined>;
   let sql = `
-    SELECT id, employee_id as employeeId, date, status, notes
-    FROM attendance
+    SELECT a.id, a.employee_id as employeeId, a.date, a.status, a.notes,
+           a.role_id as roleId, r.name as roleName
+    FROM attendance a
+    LEFT JOIN roles r ON r.id = a.role_id
     WHERE 1=1
   `;
   const params: unknown[] = [];
 
   if (employeeId) {
-    sql += ' AND employee_id = ?';
+    sql += ' AND a.employee_id = ?';
     params.push(employeeId);
   }
   if (from) {
-    sql += ' AND date >= ?';
+    sql += ' AND a.date >= ?';
     params.push(from);
   }
   if (to) {
-    sql += ' AND date <= ?';
+    sql += ' AND a.date <= ?';
     params.push(to);
   }
-  sql += ' ORDER BY date DESC';
+  sql += ' ORDER BY a.date DESC';
 
   const rows = await query(sql, params);
   res.json({ data: rows });
@@ -33,9 +35,11 @@ export const getDailyAttendance = async (req: AuthRequest, res: Response): Promi
   const date = (req.query.date as string | undefined) || new Date().toISOString().slice(0, 10);
   const rows = await query(
     `SELECT a.id, a.employee_id as employeeId, a.status, a.notes,
+            a.role_id as roleId, r.name as roleName,
             e.full_name as employeeName, e.employee_id as employeeCode
      FROM attendance a
      INNER JOIN employees e ON e.id = a.employee_id
+     LEFT JOIN roles r ON r.id = a.role_id
      WHERE a.date = ?
      ORDER BY e.full_name ASC`,
     [date]
@@ -44,10 +48,20 @@ export const getDailyAttendance = async (req: AuthRequest, res: Response): Promi
 };
 
 export const createAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { employeeId, date, status, notes } = req.body as Record<string, string | undefined>;
+  const { employeeId, date, status, notes, roleId } = req.body as Record<string, string | undefined>;
   if (!employeeId || !date || !status) {
     res.status(400).json({ error: 'employeeId, date and status are required' });
     return;
+  }
+
+  // Resolve effective role: use provided roleId, else fall back to employee's default role
+  let effectiveRoleId: string | null = roleId || null;
+  if (!effectiveRoleId) {
+    const emp = await queryOne<{ role_id: string | null }>(
+      'SELECT role_id FROM employees WHERE id = ?',
+      [employeeId]
+    );
+    effectiveRoleId = emp?.role_id ?? null;
   }
 
   const existing = await queryOne<{ id: string }>(
@@ -55,15 +69,18 @@ export const createAttendance = async (req: AuthRequest, res: Response): Promise
     [employeeId, date]
   );
   if (existing) {
-    await execute('UPDATE attendance SET status = ?, notes = ? WHERE id = ?', [status, notes || null, existing.id]);
+    await execute(
+      'UPDATE attendance SET status = ?, notes = ?, role_id = ?, updated_at = NOW() WHERE id = ?',
+      [status, notes || null, effectiveRoleId, existing.id]
+    );
     res.json({ message: 'Attendance updated for date' });
     return;
   }
 
   await execute(
-    `INSERT INTO attendance (id, employee_id, date, status, notes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, NOW(), NOW())`,
-    [generateId(), employeeId, date, status, notes || null]
+    `INSERT INTO attendance (id, employee_id, role_id, date, status, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+    [generateId(), employeeId, effectiveRoleId, date, status, notes || null]
   );
   res.status(201).json({ message: 'Attendance created' });
 };
@@ -75,10 +92,15 @@ export const updateAttendance = async (req: AuthRequest, res: Response): Promise
     return;
   }
 
-  const { status, notes } = req.body as Record<string, string | undefined>;
+  const { status, notes, roleId } = req.body as Record<string, string | undefined>;
   await execute(
-    `UPDATE attendance SET status = COALESCE(?, status), notes = COALESCE(?, notes), updated_at = NOW() WHERE id = ?`,
-    [status || null, notes ?? null, req.params.id]
+    `UPDATE attendance
+     SET status = COALESCE(?, status),
+         notes = COALESCE(?, notes),
+         role_id = COALESCE(?, role_id),
+         updated_at = NOW()
+     WHERE id = ?`,
+    [status || null, notes ?? null, roleId || null, req.params.id]
   );
   res.json({ message: 'Attendance updated' });
 };
@@ -91,10 +113,11 @@ export const getEmployeeAttendanceCalendar = async (req: AuthRequest, res: Respo
   }
 
   const rows = await query(
-    `SELECT id, date, status, notes
-     FROM attendance
-     WHERE employee_id = ? AND date BETWEEN ? AND ?
-     ORDER BY date ASC`,
+    `SELECT a.id, a.date, a.status, a.notes, a.role_id as roleId, r.name as roleName
+     FROM attendance a
+     LEFT JOIN roles r ON r.id = a.role_id
+     WHERE a.employee_id = ? AND a.date BETWEEN ? AND ?
+     ORDER BY a.date ASC`,
     [req.params.employeeId, from, to]
   );
   res.json({ data: rows });

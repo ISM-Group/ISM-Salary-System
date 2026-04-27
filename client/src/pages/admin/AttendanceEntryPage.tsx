@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { attendanceAPI, employeesAPI, departmentsAPI, getApiErrorMessage } from '@/lib/api';
+import { attendanceAPI, employeesAPI, departmentsAPI, rolesAPI, getApiErrorMessage } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ export function AttendanceEntryPage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [employeeId, setEmployeeId] = useState('');
   const [status, setStatus] = useState('PRESENT');
+  const [roleId, setRoleId] = useState('');
   const [notes, setNotes] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [search, setSearch] = useState('');
@@ -46,6 +47,22 @@ export function AttendanceEntryPage() {
     },
   });
 
+  // Determine the department of the selected employee for scoping the role dropdown
+  const selectedEmployee = useMemo(
+    () => (employeesData || []).find((e: any) => e.id === employeeId),
+    [employeesData, employeeId]
+  );
+  const roleDeptId = departmentId || selectedEmployee?.departmentId || '';
+
+  const { data: rolesData } = useQuery({
+    queryKey: ['roles-for-attendance', roleDeptId],
+    enabled: !!roleDeptId,
+    queryFn: async () => {
+      const response = await rolesAPI.getByDepartment(roleDeptId);
+      return response.data;
+    },
+  });
+
   const { data: dailyData, refetch } = useQuery({
     queryKey: ['attendance-daily', date],
     queryFn: async () => {
@@ -68,7 +85,15 @@ export function AttendanceEntryPage() {
     return m;
   }, [records]);
 
-  // initialize onLeave map when employees or records change
+  // When selected employee changes, default roleId to their primary role
+  useEffect(() => {
+    if (selectedEmployee?.roleId) {
+      setRoleId(selectedEmployee.roleId);
+    } else {
+      setRoleId('');
+    }
+  }, [selectedEmployee]);
+
   useEffect(() => {
     const m: Record<string, boolean> = {};
     (employees || []).forEach((emp: any) => {
@@ -92,7 +117,13 @@ export function AttendanceEntryPage() {
     setMessage(null);
     setSaving(true);
     try {
-      await attendanceAPI.create({ employeeId, date, status, notes: notes.trim() || null });
+      await attendanceAPI.create({
+        employeeId,
+        date,
+        status,
+        notes: notes.trim() || null,
+        roleId: roleId || null,
+      });
       setNotes('');
       await refetch();
       toast({ title: 'Attendance saved' });
@@ -110,7 +141,9 @@ export function AttendanceEntryPage() {
   const filteredEmployees = useMemo(() => {
     if (!search) return employees || [];
     const s = search.toLowerCase();
-    return (employees || []).filter((emp: any) => (emp.fullName || '').toLowerCase().includes(s) || (emp.employeeId || '').toLowerCase().includes(s));
+    return (employees || []).filter((emp: any) =>
+      (emp.fullName || '').toLowerCase().includes(s) || (emp.employeeId || '').toLowerCase().includes(s)
+    );
   }, [employees, search]);
 
   const saveBulk = async () => {
@@ -135,7 +168,13 @@ export function AttendanceEntryPage() {
         const desiredStatus = wantLeave ? 'ABSENT' : 'PRESENT';
         const existing = recordsByEmployee[emp.id];
         if (existing && existing.status === desiredStatus) return Promise.resolve(null);
-        return attendanceAPI.create({ employeeId: emp.id, date, status: desiredStatus, notes: '' });
+        return attendanceAPI.create({
+          employeeId: emp.id,
+          date,
+          status: desiredStatus,
+          notes: '',
+          roleId: roleId || null,
+        });
       });
       await Promise.all(promises);
       await refetch();
@@ -155,9 +194,9 @@ export function AttendanceEntryPage() {
             <CardTitle>Add Attendance</CardTitle>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4 md:grid-cols-5" onSubmit={submit}>
+            <form className="grid gap-4 md:grid-cols-6" onSubmit={submit}>
               {message && (
-                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 md:col-span-5">
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 md:col-span-6">
                   {message}
                 </p>
               )}
@@ -166,17 +205,14 @@ export function AttendanceEntryPage() {
               <select
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
+                onChange={(e) => { setDepartmentId(e.target.value); setEmployeeId(''); setRoleId(''); }}
               >
-                <option value="">-- Select department (bulk) --</option>
+                <option value="">-- Select dept (bulk) --</option>
                 {(departmentsData || []).map((d: any) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
+                  <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
 
-              {/* when no department selected keep single-employee entry */}
               {!departmentId ? (
                 <>
                   <select
@@ -187,9 +223,7 @@ export function AttendanceEntryPage() {
                   >
                     <option value="">Select employee</option>
                     {employees.map((e: any) => (
-                      <option key={e.id} value={e.id}>
-                        {e.fullName} ({e.employeeId})
-                      </option>
+                      <option key={e.id} value={e.id}>{e.fullName} ({e.employeeId})</option>
                     ))}
                   </select>
                   <select
@@ -200,9 +234,31 @@ export function AttendanceEntryPage() {
                     <option value="PRESENT">Present</option>
                     <option value="ABSENT">Absent</option>
                   </select>
+                  <select
+                    className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    value={roleId}
+                    onChange={(e) => setRoleId(e.target.value)}
+                  >
+                    <option value="">Role (default)</option>
+                    {(rolesData || []).map((r: any) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
                 </>
               ) : (
-                <div className="md:col-span-3" />
+                <>
+                  <select
+                    className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+                    value={roleId}
+                    onChange={(e) => setRoleId(e.target.value)}
+                  >
+                    <option value="">Role (default per employee)</option>
+                    {(rolesData || []).map((r: any) => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                  <div className="md:col-span-2" />
+                </>
               )}
 
               <Input placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -221,7 +277,7 @@ export function AttendanceEntryPage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                Department Employees {(departmentsData || []).find((d: any) => d.id === departmentId)?.name || ''}
+                Department — {(departmentsData || []).find((d: any) => d.id === departmentId)?.name || ''}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -229,7 +285,6 @@ export function AttendanceEntryPage() {
                 <Input placeholder="Search employee name or code" value={search} onChange={(e) => setSearch(e.target.value)} />
                 <Button type="button" onClick={() => setSearch('')}>Clear</Button>
               </div>
-
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -265,6 +320,7 @@ export function AttendanceEntryPage() {
                   <TableHead>Employee</TableHead>
                   <TableHead>Code</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Role</TableHead>
                   <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
@@ -273,7 +329,12 @@ export function AttendanceEntryPage() {
                   <TableRow key={row.id}>
                     <TableCell>{row.employeeName}</TableCell>
                     <TableCell>{row.employeeCode}</TableCell>
-                    <TableCell>{row.status}</TableCell>
+                    <TableCell>
+                      <span className={`text-xs font-medium ${row.status === 'PRESENT' ? 'text-green-700' : 'text-red-600'}`}>
+                        {row.status}
+                      </span>
+                    </TableCell>
+                    <TableCell>{row.roleName || '-'}</TableCell>
                     <TableCell>{row.notes || '-'}</TableCell>
                   </TableRow>
                 ))}

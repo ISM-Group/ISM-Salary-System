@@ -382,18 +382,22 @@ export const extendLoan = async (req: AuthRequest, res: Response): Promise<void>
     return;
   }
 
-  const lastInstallmentRow = await queryOne<any>(
-    `SELECT MAX(installment_number) as maxNum, due_month as lastDueMonth
-     FROM loan_installments
-     WHERE loan_id = ?`,
+  const maxRow = await queryOne<{ maxNum: number }>(
+    `SELECT MAX(installment_number) as maxNum FROM loan_installments WHERE loan_id = ?`,
     [req.params.id],
   );
+  const currentMax: number = maxRow?.maxNum ?? 0;
 
-  const currentMax: number = lastInstallmentRow?.maxNum ?? 0;
+  const lastRow = currentMax > 0
+    ? await queryOne<{ lastDueMonth: string }>(
+        `SELECT due_month as lastDueMonth FROM loan_installments WHERE loan_id = ? AND installment_number = ?`,
+        [req.params.id, currentMax],
+      )
+    : null;
 
   let nextDueDate: Date;
-  if (lastInstallmentRow?.lastDueMonth) {
-    const lastDue = new Date(lastInstallmentRow.lastDueMonth);
+  if (lastRow?.lastDueMonth) {
+    const lastDue = new Date(lastRow.lastDueMonth);
     nextDueDate = new Date(lastDue.getFullYear(), lastDue.getMonth() + 1, 1);
   } else {
     const now = new Date();

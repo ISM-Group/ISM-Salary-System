@@ -8,13 +8,16 @@ interface JwtPayload extends AuthUser {
 }
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const headerToken = req.headers.authorization?.startsWith('Bearer ')
+    ? req.headers.authorization.slice(7)
+    : undefined;
+  const queryToken = req.query.token as string | undefined;
+  const token = headerToken || queryToken;
+
+  if (!token) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
-
-  const token = authHeader.slice(7);
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     res.status(500).json({ error: 'JWT secret is not configured' });
