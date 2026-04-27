@@ -140,18 +140,27 @@
   }
 
   .glass-panel {
-    @apply rounded-2xl border border-white/50 bg-white/60 shadow-lg shadow-indigo-950/5 backdrop-blur-xl
-           dark:border-white/8 dark:bg-white/5 dark:shadow-indigo-950/30;
+    @apply rounded-2xl border border-white/50 bg-white/60 shadow-lg shadow-indigo-950/5 backdrop-blur-xl;
+  }
+
+  .dark .glass-panel {
+    @apply border-white/10 bg-white/5 shadow-indigo-950/30;
   }
 
   .glass-surface {
-    @apply border border-white/40 bg-white/50 backdrop-blur-2xl
-           dark:border-white/8 dark:bg-white/4;
+    @apply border border-white/40 bg-white/50 backdrop-blur-2xl;
+  }
+
+  .dark .glass-surface {
+    @apply border-white/10 bg-white/5;
   }
 
   .glass-subtle {
-    @apply rounded-2xl border border-white/45 bg-white/70 text-card-foreground shadow-md shadow-indigo-950/5 backdrop-blur-md
-           dark:border-white/8 dark:bg-white/5 dark:shadow-indigo-950/25;
+    @apply rounded-2xl border border-white/45 bg-white/70 text-card-foreground shadow-md shadow-indigo-950/5 backdrop-blur-md;
+  }
+
+  .dark .glass-subtle {
+    @apply border-white/10 bg-white/5 shadow-indigo-950/25;
   }
 
   .stat-card {
@@ -159,7 +168,11 @@
   }
 
   .stat-card:hover {
-    @apply shadow-xl shadow-indigo-950/10 dark:shadow-indigo-950/40;
+    @apply shadow-xl shadow-indigo-950/10;
+  }
+
+  .dark .stat-card:hover {
+    @apply shadow-indigo-950/40;
   }
 
   .page-header {
