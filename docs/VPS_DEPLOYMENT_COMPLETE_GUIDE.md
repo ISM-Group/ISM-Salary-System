@@ -2,7 +2,7 @@
 
 This guide covers:
 1. GitHub Actions secrets and environment setup
-2. DNS records for subdomain (`salary.ismgroups.lk`)
+2. DNS records for subdomain (`salary.ismgroup.lk`)
 3. VPS domain configuration (Nginx + SSL)
 4. Server environment variables
 5. Monitoring and health checks
@@ -55,8 +55,8 @@ env:
 ### Setup Details
 
 Two subdomains:
-- `salary.ismgroups.lk` → Client (React app on Nginx)
-- `api.salary.ismgroups.lk` → API (Node.js backend on localhost:5002)
+- `salary.ismgroup.lk` → Client (React app on Nginx)
+- `api.salary.ismgroup.lk` → API (Node.js backend on localhost:5002)
 
 ### Step 1: Get your VPS IP address
 
@@ -67,7 +67,7 @@ curl -s http://ifconfig.me
 
 ### Step 2: Add DNS records in your domain registrar
 
-Login to `ismgroups.lk` domain registrar (e.g., NameSilo, Godaddy, etc.).
+Login to `ismgroup.lk` domain registrar (e.g., NameSilo, Godaddy, etc.).
 
 **A record 1 (client subdomain):**
 ```
@@ -102,10 +102,10 @@ TTL:    3600
 
 Wait 5-30 minutes, then test:
 ```bash
-nslookup salary.ismgroups.lk
+nslookup salary.ismgroup.lk
 # Should show: Address: 203.0.113.42
 
-nslookup api.salary.ismgroups.lk
+nslookup api.salary.ismgroup.lk
 # Should show: Address: 203.0.113.42
 ```
 
@@ -128,7 +128,7 @@ sudo chown -R deploy:deploy /home/deploy/ism-server
 
 SSH into your VPS:
 ```bash
-ssh deploy@salary.ismgroups.lk
+ssh deploy@salary.ismgroup.lk
 # or ssh deploy@YOUR_VPS_IP if DNS not ready yet
 ```
 
@@ -143,7 +143,7 @@ DATABASE_NAME=ISM_salary
 
 PORT=5002
 NODE_ENV=production
-CLIENT_URL=https://salary.ismgroups.lk  # Use https in production
+CLIENT_URL=https://salary.ismgroup.lk  # Use https in production
 
 JWT_SECRET=YOUR_LONG_RANDOM_SECRET_KEY_HERE
 JWT_EXPIRES_IN=8h
@@ -174,11 +174,11 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 Create file: `/etc/nginx/sites-available/ism-salary` with two separate server blocks:
 
 ```nginx
-# ============ CLIENT: salary.ismgroups.lk ============
+# ============ CLIENT: salary.ismgroup.lk ============
 server {
     listen 80;
     listen [::]:80;
-    server_name salary.ismgroups.lk;
+    server_name salary.ismgroup.lk;
 
     # Client (static assets - React app)
     location / {
@@ -194,11 +194,11 @@ server {
     }
 }
 
-# ============ API: api.salary.ismgroups.lk ============
+# ============ API: api.salary.ismgroup.lk ============
 server {
     listen 80;
     listen [::]:80;
-    server_name api.salary.ismgroups.lk;
+    server_name api.salary.ismgroup.lk;
 
     # API proxy to backend (all traffic goes to Node.js)
     location / {
@@ -239,8 +239,8 @@ sudo systemctl reload nginx
 Generate SSL certificates for **both subdomains**:
 
 ```bash
-sudo certbot --nginx -d salary.ismgroups.lk --redirect
-sudo certbot --nginx -d api.salary.ismgroups.lk --redirect
+sudo certbot --nginx -d salary.ismgroup.lk --redirect
+sudo certbot --nginx -d api.salary.ismgroup.lk --redirect
 ```
 
 Follow the prompts. Certbot will:
@@ -251,8 +251,8 @@ Follow the prompts. Certbot will:
 
 Verify SSL:
 ```bash
-curl -I https://salary.ismgroups.lk
-curl -I https://api.salary.ismgroups.lk/health
+curl -I https://salary.ismgroup.lk
+curl -I https://api.salary.ismgroup.lk/health
 ```
 
 ---
@@ -337,9 +337,9 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_deploy -C "deploy@ismgroups"
 
 **Copy public key to VPS:**
 ```bash
-ssh-copy-id -i ~/.ssh/id_rsa_deploy deploy@salary.ismgroups.lk
+ssh-copy-id -i ~/.ssh/id_rsa_deploy deploy@salary.ismgroup.lk
 # or manually:
-cat ~/.ssh/id_rsa_deploy.pub | ssh deploy@salary.ismgroups.lk "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+cat ~/.ssh/id_rsa_deploy.pub | ssh deploy@salary.ismgroup.lk "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
 ```
 
 **Add private key to GitHub Secrets:**
@@ -386,7 +386,7 @@ sudo systemctl status nginx
 pm2 status
 
 # Check if backend is responding
-curl -I https://api.salary.ismgroups.lk/health
+curl -I https://api.salary.ismgroup.lk/health
 
 # Check database connection
 mysql -u mrfawz_user -p -e "SELECT VERSION();"
@@ -450,7 +450,7 @@ sudo certbot renew --dry-run
 ## Next Steps
 
 1. **Add GitHub Secrets** (SSH_PRIVATE_KEY, VPS_HOST, etc.)
-2. **Add DNS A record** for `salary.ismgroups.lk`
+2. **Add DNS A record** for `salary.ismgroup.lk`
 3. **SSH into VPS**, run VPS setup commands (directories, Node, PM2, Nginx)
 4. **Create `.env`** on VPS
 5. **Setup SSL** with Certbot

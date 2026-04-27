@@ -156,7 +156,7 @@ SELECT
 -- [ ] Test default login (admin/password)
 -- [ ] Verify in application UI
 -- [ ] Take database backup
--- [ ] Update .env file with DATABASE_HOST=api.salary.ismgroups.lk or 127.0.0.1
+-- [ ] Update .env file with DATABASE_HOST=api.salary.ismgroup.lk or 127.0.0.1
 -- [ ] Update application configuration
 -- [ ] Deploy application
 -- [ ] Monitor logs for errors

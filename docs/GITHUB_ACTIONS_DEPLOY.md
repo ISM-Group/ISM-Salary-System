@@ -18,7 +18,7 @@ Workflows added
 Required GitHub Repository Secrets (Only 3!)
 
 - `SSH_PRIVATE_KEY` — private SSH key for the deploy user (PEM format). Keep this private.
-- `VPS_HOST` — server host or IP address (e.g. `203.0.113.12` or `salary.ismgroups.lk`).
+- `VPS_HOST` — server host or IP address (e.g. `203.0.113.12` or `salary.ismgroup.lk`).
 - `VPS_USER` — SSH user on VPS (e.g. `deploy`).
 
 **Hardcoded in Workflows (No Secrets Needed):**

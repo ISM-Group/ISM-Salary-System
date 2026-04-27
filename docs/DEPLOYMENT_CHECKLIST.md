@@ -8,7 +8,7 @@
 | Secret Name | Example Value | Notes |
 |-------------|---------------|-------|
 | `SSH_PRIVATE_KEY` | (paste entire private key) | Keep secure! |
-| `VPS_HOST` | `203.0.113.42` | Or `salary.ismgroups.lk` after DNS is ready |
+| `VPS_HOST` | `203.0.113.42` | Or `salary.ismgroup.lk` after DNS is ready |
 | `VPS_USER` | `deploy` | SSH user on VPS |
 
 **Note:** Deployment paths (`/var/www/ism-client`, `/home/deploy/ism-server`) and PM2 process name (`ism-server`) are **hardcoded in the workflows** — no secrets needed for these!
@@ -22,10 +22,10 @@
 
 ## Phase 2: DNS Setup (10-30 min, wait for propagation)
 
-**Your Domain:** `ismgroups.lk`  
+**Your Domain:** `ismgroup.lk`  
 **Subdomains:**
-- `salary.ismgroups.lk` → Client (React app)
-- `api.salary.ismgroups.lk` → API backend (Node.js)
+- `salary.ismgroup.lk` → Client (React app)
+- `api.salary.ismgroup.lk` → API backend (Node.js)
 
 ### Step 1: Get VPS IP
 ```bash
@@ -36,7 +36,7 @@ curl -s http://ifconfig.me
 
 ### Step 2: Add DNS records (2 A records)
 - Login to your domain registrar (NameSilo, GoDaddy, etc.)
-- Go to DNS settings for `ismgroups.lk`
+- Go to DNS settings for `ismgroup.lk`
 - **Add first A record (client):**
   - Type: `A`
   - Name: `salary`
@@ -52,10 +52,10 @@ curl -s http://ifconfig.me
 ### Step 3: Wait & verify
 ```bash
 # Wait 5-30 minutes, then test:
-nslookup salary.ismgroups.lk
+nslookup salary.ismgroup.lk
 # Should show: Address: 203.0.113.42
 
-nslookup api.salary.ismgroups.lk
+nslookup api.salary.ismgroup.lk
 # Should show: Address: 203.0.113.42
 ```
 
@@ -65,7 +65,7 @@ nslookup api.salary.ismgroups.lk
 
 ### SSH into VPS
 ```bash
-ssh deploy@salary.ismgroups.lk
+ssh deploy@salary.ismgroup.lk
 # If DNS not ready yet:
 ssh deploy@203.0.113.42
 ```
@@ -113,7 +113,7 @@ DATABASE_NAME=ISM_salary
 
 PORT=5002
 NODE_ENV=production
-CLIENT_URL=https://salary.ismgroups.lk
+CLIENT_URL=https://salary.ismgroup.lk
 
 JWT_SECRET=YOUR_LONG_RANDOM_SECRET
 JWT_EXPIRES_IN=8h
@@ -124,7 +124,7 @@ EOF
 chmod 600 /home/deploy/ism-server/.env
 ```
 
-**Note:** `CLIENT_URL` points to the client subdomain (`salary.ismgroups.lk`). The server runs on `localhost:5002` and is proxied by Nginx from `api.salary.ismgroups.lk`.
+**Note:** `CLIENT_URL` points to the client subdomain (`salary.ismgroup.lk`). The server runs on `localhost:5002` and is proxied by Nginx from `api.salary.ismgroup.lk`.
 
 ---
 
@@ -133,11 +133,11 @@ chmod 600 /home/deploy/ism-server/.env
 Create Nginx config with two separate server blocks (one for client, one for API):
 ```bash
 sudo cat > /etc/nginx/sites-available/ism-salary << 'EOF'
-# ============ CLIENT: salary.ismgroups.lk ============
+# ============ CLIENT: salary.ismgroup.lk ============
 server {
     listen 80;
     listen [::]:80;
-    server_name salary.ismgroups.lk;
+    server_name salary.ismgroup.lk;
 
     # Client static files (React app)
     location / {
@@ -152,11 +152,11 @@ server {
     }
 }
 
-# ============ API: api.salary.ismgroups.lk ============
+# ============ API: api.salary.ismgroup.lk ============
 server {
     listen 80;
     listen [::]:80;
-    server_name api.salary.ismgroups.lk;
+    server_name api.salary.ismgroup.lk;
 
     # All traffic to backend
     location / {
@@ -199,8 +199,8 @@ Generate SSL certificates for **both subdomains**:
 
 ```bash
 # Certbot will update the Nginx file and add redirects to HTTPS
-sudo certbot --nginx -d salary.ismgroups.lk --redirect
-sudo certbot --nginx -d api.salary.ismgroups.lk --redirect
+sudo certbot --nginx -d salary.ismgroup.lk --redirect
+sudo certbot --nginx -d api.salary.ismgroup.lk --redirect
 ```
 
 Follow prompts. Certbot will create certificates and update the matching
@@ -208,8 +208,8 @@ server blocks automatically.
 
 Verify SSL:
 ```bash
-curl -I https://salary.ismgroups.lk
-curl -I https://api.salary.ismgroups.lk/health
+curl -I https://salary.ismgroup.lk
+curl -I https://api.salary.ismgroup.lk/health
 ```
 
 ---
@@ -269,10 +269,10 @@ Watch GitHub Actions:
 Check live:
 ```bash
 # Client should load
-curl -I https://salary.ismgroups.lk
+curl -I https://salary.ismgroup.lk
 
 # API health check (if backend has /health endpoint)
-curl https://api.salary.ismgroups.lk/health
+curl https://api.salary.ismgroup.lk/health
 ```
 
 ---
@@ -283,8 +283,8 @@ curl https://api.salary.ismgroups.lk/health
 
 ```bash
 # From your local machine:
-curl -I https://salary.ismgroups.lk                    # Client should return 200
-curl -I https://api.salary.ismgroups.lk                # API should return 200 or API response
+curl -I https://salary.ismgroup.lk                    # Client should return 200
+curl -I https://api.salary.ismgroup.lk                # API should return 200 or API response
 
 # SSH to VPS and check:
 pm2 status                                              # ism-server should be online
@@ -331,9 +331,9 @@ git push origin main                # Triggers GitHub Actions
 
 | Problem | Quick Fix |
 |---------|----------|
-| DNS not working | Wait 30 min, check **both A records** in registrar, verify `nslookup salary.ismgroups.lk` and `nslookup api.salary.ismgroups.lk` |
+| DNS not working | Wait 30 min, check **both A records** in registrar, verify `nslookup salary.ismgroup.lk` and `nslookup api.salary.ismgroup.lk` |
 | 502 Bad Gateway on api subdomain | SSH to VPS, run `pm2 status` and `pm2 logs ism-server` |
-| SSL not working | Run `sudo certbot --nginx -d salary.ismgroups.lk --redirect` and `sudo certbot --nginx -d api.salary.ismgroups.lk --redirect` |
+| SSL not working | Run `sudo certbot --nginx -d salary.ismgroup.lk --redirect` and `sudo certbot --nginx -d api.salary.ismgroup.lk --redirect` |
 | Client page returns 404 | Check files in `/var/www/ism-client`, run client workflow |
 | API fails to respond | Check Nginx proxy config, verify backend runs on `localhost:5002` |
 | GitHub Actions fails | Check Secret values, verify SSH key permissions (600), check action logs |

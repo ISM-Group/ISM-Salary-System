@@ -48,7 +48,7 @@ MIIEpAIBAAKCAQEA7s4k...
 
 **Value examples:**
 - IP address: `203.0.113.42`
-- Or hostname (after DNS setup): `salary.ismgroups.lk`
+- Or hostname (after DNS setup): `salary.ismgroup.lk`
 
 **Where to get:** From your VPS provider dashboard or:
 ```bash

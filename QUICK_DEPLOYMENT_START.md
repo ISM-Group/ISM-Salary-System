@@ -22,7 +22,7 @@ cat ~/.ssh/id_rsa_deploy   # on your local machine
 
 ## Phase 2: Setup DNS (10 min + 5-30 min propagation)
 
-Login to your domain registrar (ismgroups.lk).
+Login to your domain registrar (ismgroup.lk).
 
 Add these A records:
 
@@ -33,8 +33,8 @@ Add these A records:
 
 **Verify DNS works:**
 ```bash
-nslookup salary.ismgroups.lk
-nslookup api.salary.ismgroups.lk
+nslookup salary.ismgroup.lk
+nslookup api.salary.ismgroup.lk
 # Both should show your VPS IP
 ```
 
@@ -44,7 +44,7 @@ nslookup api.salary.ismgroups.lk
 
 SSH into your VPS:
 ```bash
-ssh deploy@salary.ismgroups.lk  # (or use your VPS IP if DNS not ready)
+ssh deploy@salary.ismgroup.lk  # (or use your VPS IP if DNS not ready)
 ```
 
 Create directories (use `prepare_vps.sh` script or run manually):
@@ -76,11 +76,11 @@ sudo apt install -y nginx certbot python3-certbot-nginx
 
 ```bash
 sudo tee /etc/nginx/sites-available/ism-salary > /dev/null <<'EOF'
-# ============ CLIENT: salary.ismgroups.lk ============
+# ============ CLIENT: salary.ismgroup.lk ============
 server {
     listen 80;
     listen [::]:80;
-    server_name salary.ismgroups.lk;
+    server_name salary.ismgroup.lk;
     
     location / {
         root /var/www/ism-client;
@@ -94,11 +94,11 @@ server {
     }
 }
 
-# ============ API: api.salary.ismgroups.lk ============
+# ============ API: api.salary.ismgroup.lk ============
 server {
     listen 80;
     listen [::]:80;
-    server_name api.salary.ismgroups.lk;
+    server_name api.salary.ismgroup.lk;
     
     location / {
         proxy_pass http://localhost:5002;
@@ -134,14 +134,14 @@ sudo systemctl reload nginx
 
 ```bash
 # Certbot will add HTTPS server blocks and HTTP->HTTPS redirects
-sudo certbot --nginx -d salary.ismgroups.lk --redirect
-sudo certbot --nginx -d api.salary.ismgroups.lk --redirect
+sudo certbot --nginx -d salary.ismgroup.lk --redirect
+sudo certbot --nginx -d api.salary.ismgroup.lk --redirect
 ```
 
 **Verify SSL works:**
 ```bash
-curl -I https://salary.ismgroups.lk
-curl -I https://api.salary.ismgroups.lk/health
+curl -I https://salary.ismgroup.lk
+curl -I https://api.salary.ismgroup.lk/health
 # Should return 200/301 with SSL info
 ```
 
@@ -177,7 +177,7 @@ EXIT;
 
 ```bash
 # From your local machine:
-scp PROD_DATABASE_SETUP.sql deploy@salary.ismgroups.lk:/tmp/
+scp PROD_DATABASE_SETUP.sql deploy@salary.ismgroup.lk:/tmp/
 
 # On VPS:
 mysql -u mrfawz_user -pMrFawz2026 ISM_salary < /tmp/PROD_DATABASE_SETUP.sql
@@ -222,7 +222,7 @@ DATABASE_NAME=ISM_salary
 
 PORT=5002
 NODE_ENV=production
-CLIENT_URL=https://salary.ismgroups.lk
+CLIENT_URL=https://salary.ismgroup.lk
 
 JWT_SECRET=$(openssl rand -base64 32)
 JWT_EXPIRES_IN=8h
@@ -253,10 +253,10 @@ git push origin main
 4. Test endpoints:
    ```bash
    # Client
-   curl -I https://salary.ismgroups.lk
+   curl -I https://salary.ismgroup.lk
    
    # API (should proxy to backend)
-   curl https://api.salary.ismgroups.lk/health
+   curl https://api.salary.ismgroup.lk/health
    ```
 
 ---
@@ -266,7 +266,7 @@ git push origin main
 | Issue | Fix |
 |-------|-----|
 | "Permission denied" on `/var/www` | Run VPS setup phase again with correct user |
-| DNS not resolving | Wait 30 min for TTL to expire, then `nslookup salary.ismgroups.lk` |
+| DNS not resolving | Wait 30 min for TTL to expire, then `nslookup salary.ismgroup.lk` |
 | SSL certificate error | Ensure DNS A records are correct and set before running Certbot |
 | PM2 process won't start | Check server logs: `pm2 logs ism-server` |
 | 502 Bad Gateway from Nginx | Verify Node.js running: `pm2 info ism-server` |
@@ -292,7 +292,7 @@ If you don't have SSH keys yet:
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_deploy -N ""
 
 # Copy to VPS
-ssh-copy-id -i ~/.ssh/id_rsa_deploy deploy@salary.ismgroups.lk
+ssh-copy-id -i ~/.ssh/id_rsa_deploy deploy@salary.ismgroup.lk
 
 # Add to GitHub Secrets
 cat ~/.ssh/id_rsa_deploy  # Copy output → SSH_PRIVATE_KEY secret

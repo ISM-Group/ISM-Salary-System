@@ -34,6 +34,10 @@ jobs:
         run: |
           npm ci
           npm run build
+          if grep -R "ismgroups.lk" dist; then
+            echo "Plural domain is not allowed in client build. Use ismgroup.lk."
+            exit 1
+          fi
           rm -rf node_modules
 
       - name: Compress Client Build

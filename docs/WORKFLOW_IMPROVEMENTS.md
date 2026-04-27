@@ -115,7 +115,7 @@ Both workflows trigger on:
 Only 3 secrets needed:
 ```
 SSH_PRIVATE_KEY    → Deploy user's private key (PEM)
-VPS_HOST           → 203.0.113.42 (or salary.ismgroups.lk after DNS)
+VPS_HOST           → 203.0.113.42 (or salary.ismgroup.lk after DNS)
 VPS_USER           → deploy
 ```
 
@@ -166,5 +166,5 @@ tar -tzf server-deploy.tar.gz | head -20
 2. Watch the Actions tab for deployment
 3. Check VPS logs: `pm2 logs ism-server`
 4. Test both subdomains:
-   - `https://salary.ismgroups.lk` (client)
-   - `https://api.salary.ismgroups.lk` (API)
+   - `https://salary.ismgroup.lk` (client)
+   - `https://api.salary.ismgroup.lk` (API)
