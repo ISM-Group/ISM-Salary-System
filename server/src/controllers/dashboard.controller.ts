@@ -23,22 +23,31 @@ export const getStats = async (req: AuthRequest, res: Response) => {
       [currentMonth]
     );
 
-    const monthlySalary = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(released_amount), 0) as total
-       FROM salary_releases
-       WHERE status = 'RELEASED' AND DATE_FORMAT(period_start, '%Y-%m') = ?`,
-      [currentMonth]
-    );
-
     const previousMonth = new Date();
     previousMonth.setMonth(previousMonth.getMonth() - 1);
     const prevMonthStr = previousMonth.toISOString().slice(0, 7);
-    const previousSalary = await queryOne<{ total: number }>(
-      `SELECT COALESCE(SUM(released_amount), 0) as total
-       FROM salary_releases
-       WHERE status = 'RELEASED' AND DATE_FORMAT(period_start, '%Y-%m') = ?`,
-      [prevMonthStr]
-    );
+
+    // salary_releases may not exist yet if migration hasn't run — return 0 gracefully
+    let monthlySalary: { total: number } | null = null;
+    let previousSalary: { total: number } | null = null;
+    try {
+      [monthlySalary, previousSalary] = await Promise.all([
+        queryOne<{ total: number }>(
+          `SELECT COALESCE(SUM(released_amount), 0) as total
+           FROM salary_releases
+           WHERE status = 'RELEASED' AND DATE_FORMAT(period_start, '%Y-%m') = ?`,
+          [currentMonth]
+        ),
+        queryOne<{ total: number }>(
+          `SELECT COALESCE(SUM(released_amount), 0) as total
+           FROM salary_releases
+           WHERE status = 'RELEASED' AND DATE_FORMAT(period_start, '%Y-%m') = ?`,
+          [prevMonthStr]
+        ),
+      ]);
+    } catch {
+      // table not yet created — fall through with nulls (returns 0 to client)
+    }
 
     const salaryTrend = previousSalary?.total
       ? ((monthlySalary?.total || 0) - (previousSalary.total || 0)) / (previousSalary.total || 1) * 100
@@ -70,20 +79,24 @@ export const getStats = async (req: AuthRequest, res: Response) => {
 export const getSalaryTrends = async (req: AuthRequest, res: Response) => {
   try {
     const months = parseInt(req.query.months as string, 10) || 6;
-    
-    const sql = `
-      SELECT
-        DATE_FORMAT(period_start, '%Y-%m') as month,
-        SUM(released_amount) as total,
-        COUNT(*) as count
-      FROM salary_releases
-      WHERE status = 'RELEASED'
-        AND period_start >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
-      GROUP BY DATE_FORMAT(period_start, '%Y-%m')
-      ORDER BY month ASC
-    `;
 
-    const trends = await query<any>(sql, [months]);
+    let trends: any[] = [];
+    try {
+      trends = await query<any>(
+        `SELECT
+           DATE_FORMAT(period_start, '%Y-%m') as month,
+           SUM(released_amount) as total,
+           COUNT(*) as count
+         FROM salary_releases
+         WHERE status = 'RELEASED'
+           AND period_start >= DATE_SUB(CURDATE(), INTERVAL ? MONTH)
+         GROUP BY DATE_FORMAT(period_start, '%Y-%m')
+         ORDER BY month ASC`,
+        [months]
+      );
+    } catch {
+      // table not yet created — return empty array
+    }
 
     res.json({
       data: trends.map((t: any) => ({
