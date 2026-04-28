@@ -36,7 +36,10 @@ export const createEmployeeSchema = z.object({
   roleId: z.preprocess(blankToNull, z.string().nullable().optional()),
   hireDate: dateString,
   salaryType: z.enum(['FIXED', 'DAILY_WAGE']).optional().default('DAILY_WAGE'),
-  baseSalary: z.number().min(0).nullable().optional(),
+  baseSalary: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+    z.number().min(0).nullable().optional()
+  ),
   isActive: z.boolean().optional().default(true),
   addressLine1: z.preprocess(blankToNull, z.string().max(255).nullable().optional()),
   addressLine2: z.preprocess(blankToNull, z.string().max(255).nullable().optional()),
@@ -54,7 +57,10 @@ export const updateEmployeeSchema = z.object({
   roleId: z.preprocess(blankToNull, z.string().nullable().optional()),
   hireDate: optionalDateString,
   salaryType: z.enum(['FIXED', 'DAILY_WAGE']).optional(),
-  baseSalary: z.number().min(0).nullable().optional(),
+  baseSalary: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+    z.number().min(0).nullable().optional()
+  ),
   isActive: z.boolean().optional(),
   addressLine1: z.preprocess(blankToNull, z.string().max(255).nullable().optional()),
   addressLine2: z.preprocess(blankToNull, z.string().max(255).nullable().optional()),
