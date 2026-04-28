@@ -73,6 +73,118 @@ export function TableLoadingRows({ rows = 5, columns = 5 }: { rows?: number; col
   );
 }
 
+function SkeletonBlock({ className }: { className?: string }) {
+  return <div className={cn('skeleton', className)} />;
+}
+
+export function SummaryCardsSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="content-enter grid grid-cols-2 gap-4 md:grid-cols-4">
+      {Array.from({ length: count }).map((_, index) => (
+        <div key={index} className="glass-panel p-4">
+          <SkeletonBlock className="mb-3 h-3 w-24" />
+          <SkeletonBlock className="h-7 w-16" />
+          <SkeletonBlock className="mt-2 h-3 w-20" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function FormCardSkeleton({ fields = 4 }: { fields?: number }) {
+  return (
+    <div className="glass-panel content-enter p-4 sm:p-6">
+      <SkeletonBlock className="mb-5 h-5 w-40" />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: fields }).map((_, index) => (
+          <div key={index} className="space-y-2">
+            <SkeletonBlock className="h-3 w-20" />
+            <SkeletonBlock className="h-10 w-full" />
+          </div>
+        ))}
+      </div>
+      <SkeletonBlock className="mt-5 h-10 w-32" />
+    </div>
+  );
+}
+
+export function TableCardSkeleton({
+  rows = 6,
+  columns = 5,
+  titleWidth = 'w-36',
+}: {
+  rows?: number;
+  columns?: number;
+  titleWidth?: string;
+}) {
+  return (
+    <div className="glass-panel content-enter overflow-hidden">
+      <div className="flex items-center justify-between border-b border-border/70 px-4 py-4 sm:px-6">
+        <SkeletonBlock className={cn('h-5', titleWidth)} />
+        <SkeletonBlock className="h-9 w-28" />
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <tbody>
+            <TableLoadingRows rows={rows} columns={columns} />
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+export function PageSkeleton({
+  variant = 'table',
+}: {
+  variant?: 'dashboard' | 'form' | 'table' | 'form-table';
+}) {
+  if (variant === 'dashboard') {
+    return (
+      <div className="content-enter space-y-6">
+        <SummaryCardsSkeleton />
+        <div className="grid gap-6 lg:grid-cols-2">
+          <TableCardSkeleton rows={5} columns={3} />
+          <TableCardSkeleton rows={5} columns={3} />
+        </div>
+        <TableCardSkeleton rows={6} columns={4} />
+      </div>
+    );
+  }
+
+  if (variant === 'form') {
+    return (
+      <div className="content-enter space-y-6">
+        <FormCardSkeleton fields={8} />
+      </div>
+    );
+  }
+
+  if (variant === 'form-table') {
+    return (
+      <div className="content-enter space-y-6">
+        <FormCardSkeleton />
+        <SummaryCardsSkeleton />
+        <TableCardSkeleton />
+      </div>
+    );
+  }
+
+  return (
+    <div className="content-enter space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-1 flex-col gap-3 sm:flex-row">
+          <SkeletonBlock className="h-10 w-full sm:w-64" />
+          <SkeletonBlock className="h-10 w-full sm:w-32" />
+          <SkeletonBlock className="h-10 w-full sm:w-28" />
+        </div>
+        <SkeletonBlock className="h-10 w-full sm:w-32" />
+      </div>
+      <TableCardSkeleton />
+    </div>
+  );
+}
+
 export function SectionLoading({ rows = 3 }: { rows?: number }) {
   return (
     <div className="content-enter grid gap-3">

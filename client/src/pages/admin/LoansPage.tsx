@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Pagination } from '@/components/ui/pagination';
+import { PageSkeleton, SummaryCardsSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 import { formatCurrency } from '@/lib/utils';
 import { AlertCircle } from 'lucide-react';
 import { isPositiveNumber } from '@/lib/formValidation';
@@ -30,7 +31,7 @@ export function LoansPage() {
   const { toast } = useToast();
   const limit = 20;
 
-  const { data: employeesData } = useQuery({
+  const { data: employeesData, isLoading: isEmployeesLoading } = useQuery({
     queryKey: ['employees-for-loans'],
     queryFn: async () => {
       const response = await employeesAPI.getAll({ isActive: true });
@@ -38,7 +39,7 @@ export function LoansPage() {
     },
   });
 
-  const { data: loansResponse, refetch } = useQuery({
+  const { data: loansResponse, isLoading: isLoansLoading, refetch } = useQuery({
     queryKey: ['loans-admin', statusFilter, page, limit],
     queryFn: async () => {
       const params: Record<string, unknown> = { page, limit };
@@ -119,6 +120,14 @@ export function LoansPage() {
   const totalDailyDeduction = allLoans
     .filter((l: any) => l.status === 'ACTIVE' && l.repaymentMode === 'DAILY')
     .reduce((sum: number, l: any) => sum + Number(l.dailyRepaymentAmount || 0), 0);
+
+  if (isEmployeesLoading && isLoansLoading) {
+    return (
+      <MainLayout title="Loans" description="Manage employee loans with daily or monthly repayment">
+        <PageSkeleton variant="form-table" />
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout title="Loans" description="Manage employee loans with daily or monthly repayment">
@@ -235,7 +244,9 @@ export function LoansPage() {
         )}
 
         {/* Summary Cards */}
-        {allLoans.length > 0 && (
+        {isLoansLoading ? (
+          <SummaryCardsSkeleton />
+        ) : allLoans.length > 0 && (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
@@ -308,7 +319,9 @@ export function LoansPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {allLoans.length === 0 ? (
+                  {isLoansLoading ? (
+                    <TableLoadingRows rows={6} columns={7} />
+                  ) : allLoans.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="text-center text-gray-500 py-8">
                         {statusFilter

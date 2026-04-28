@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
 
 export function DepartmentsPage() {
@@ -16,7 +17,7 @@ export function DepartmentsPage() {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  const { data, refetch } = useQuery({
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['departments-admin'],
     queryFn: async () => {
       const response = await departmentsAPI.getAll();
@@ -66,6 +67,9 @@ export function DepartmentsPage() {
 
   return (
     <MainLayout title="Departments" description="Manage departments">
+      {isLoading ? (
+        <PageSkeleton variant="form-table" />
+      ) : (
       <div className="space-y-6">
         <Card>
           <CardHeader>
@@ -106,7 +110,9 @@ export function DepartmentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(data || []).map((row: any) => (
+                {isLoading ? (
+                  <TableLoadingRows rows={5} columns={3} />
+                ) : (data || []).map((row: any) => (
                   <TableRow key={row.id}>
                     <TableCell>{row.name}</TableCell>
                     <TableCell>{row.description || '-'}</TableCell>
@@ -147,6 +153,7 @@ export function DepartmentsPage() {
           </CardContent>
         </Card>
       </div>
+      )}
     </MainLayout>
   );
 }

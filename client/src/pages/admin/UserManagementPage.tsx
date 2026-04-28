@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { TableLoadingRows } from '@/components/ui/loading-spinner';
+import { PageSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
 import { KeyRound, UserCheck, UserX } from 'lucide-react';
 
@@ -59,6 +59,10 @@ export function UserManagementPage() {
 
   return (
     <MainLayout title="User Management" description="Manage system users, reset passwords, activate or deactivate accounts">
+      {isLoading && !data ? (
+        <PageSkeleton variant="table" />
+      ) : (
+      <>
       <Card>
         <CardHeader>
           <CardTitle>System Users</CardTitle>
@@ -148,6 +152,8 @@ export function UserManagementPage() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </MainLayout>
   );

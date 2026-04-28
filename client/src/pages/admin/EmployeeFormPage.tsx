@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageSkeleton } from '@/components/ui/loading-spinner';
 import { FormErrors, isIsoDate } from '@/lib/formValidation';
 import { useToast } from '@/hooks/use-toast';
 import { Camera, ImagePlus, UserRound, X } from 'lucide-react';
@@ -33,13 +34,13 @@ export function EmployeeFormPage() {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  const { data: departmentsData } = useQuery({
+  const { data: departmentsData, isLoading: isDepartmentsLoading } = useQuery({
     queryKey: ['departments-for-employee-form'],
     queryFn: async () => (await departmentsAPI.getAll()).data,
   });
 
   // Filter roles by department AND salary type (returns exact-type + ANY roles)
-  const { data: rolesData } = useQuery({
+  const { data: rolesData, isLoading: isRolesLoading } = useQuery({
     queryKey: ['roles-for-employee-form', departmentId, salaryType],
     queryFn: async () => {
       if (!departmentId) {
@@ -51,7 +52,7 @@ export function EmployeeFormPage() {
     },
   });
 
-  const { data: employeeData } = useQuery({
+  const { data: employeeData, isLoading: isEmployeeLoading } = useQuery({
     queryKey: ['employee-edit', id],
     enabled: isEdit,
     queryFn: async () => (await employeesAPI.getById(id!)).data,
@@ -135,9 +136,13 @@ export function EmployeeFormPage() {
   };
 
   const isFixed = salaryType === 'FIXED';
+  const isInitialLoading = (isEdit && isEmployeeLoading) || (!isEdit && isDepartmentsLoading && isRolesLoading);
 
   return (
     <MainLayout title={isEdit ? 'Edit Employee' : 'Add Employee'} description="Manage employee profile details">
+      {isInitialLoading ? (
+        <PageSkeleton variant="form" />
+      ) : (
       <Card>
         <CardHeader>
           <CardTitle>{isEdit ? 'Update Employee' : 'Create Employee'}</CardTitle>
@@ -338,6 +343,7 @@ export function EmployeeFormPage() {
           </form>
         </CardContent>
       </Card>
+      )}
     </MainLayout>
   );
 }

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 import { formatCurrency } from '@/lib/utils';
 import { isNonNegativeNumber } from '@/lib/formValidation';
 import { useToast } from '@/hooks/use-toast';
@@ -34,11 +35,11 @@ export function RolesPage() {
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
 
-  const { data: departmentsData } = useQuery({
+  const { data: departmentsData, isLoading: isDepartmentsLoading } = useQuery({
     queryKey: ['departments-for-roles'],
     queryFn: async () => (await departmentsAPI.getAll()).data,
   });
-  const { data: rolesData, refetch } = useQuery({
+  const { data: rolesData, isLoading: isRolesLoading, refetch } = useQuery({
     queryKey: ['roles-admin'],
     queryFn: async () => (await rolesAPI.getAll()).data,
   });
@@ -97,6 +98,9 @@ export function RolesPage() {
 
   return (
     <MainLayout title="Roles" description="Manage roles and wage rates">
+      {isDepartmentsLoading && isRolesLoading ? (
+        <PageSkeleton variant="form-table" />
+      ) : (
       <div className="space-y-6">
         <Card>
           <CardHeader>
@@ -177,7 +181,9 @@ export function RolesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(rolesData || []).map((r: any) => {
+                {isRolesLoading ? (
+                  <TableLoadingRows rows={6} columns={5} />
+                ) : (rolesData || []).map((r: any) => {
                   const st: SalaryType = r.salaryType || 'ANY';
                   return (
                     <TableRow key={r.id}>
@@ -227,6 +233,7 @@ export function RolesPage() {
           </CardContent>
         </Card>
       </div>
+      )}
     </MainLayout>
   );
 }

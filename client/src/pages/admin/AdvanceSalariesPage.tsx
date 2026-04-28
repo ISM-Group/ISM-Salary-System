@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageSkeleton, SummaryCardsSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 import { formatCurrency } from '@/lib/utils';
 import { CheckCircle, XCircle, Filter } from 'lucide-react';
 import { isIsoDate, isPositiveNumber } from '@/lib/formValidation';
@@ -35,14 +36,14 @@ export function AdvanceSalariesPage() {
   const [message, setMessage] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const { data: employeesData } = useQuery({
+  const { data: employeesData, isLoading: isEmployeesLoading } = useQuery({
     queryKey: ['employees-for-advance'],
     queryFn: async () => {
       const response = await employeesAPI.getAll({ isActive: true });
       return response.data;
     },
   });
-  const { data: advanceData, refetch } = useQuery({
+  const { data: advanceData, isLoading: isAdvancesLoading, refetch } = useQuery({
     queryKey: ['advance-salaries-admin', statusFilter],
     queryFn: async () => {
       const params: Record<string, unknown> = {};
@@ -140,6 +141,14 @@ export function AdvanceSalariesPage() {
     .filter((r: any) => r.status === 'APPROVED')
     .reduce((sum: number, r: any) => sum + Number(r.amount || 0), 0);
 
+  if (isEmployeesLoading && isAdvancesLoading) {
+    return (
+      <MainLayout title="Advance Salaries" description="Track salary advances. Only APPROVED advances are deducted from daily releases.">
+        <PageSkeleton variant="form-table" />
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout title="Advance Salaries" description="Track salary advances. Only APPROVED advances are deducted from daily releases.">
       <div className="space-y-6">
@@ -181,7 +190,9 @@ export function AdvanceSalariesPage() {
         </Card>
 
         {/* Summary Cards */}
-        {allRecords.length > 0 && (
+        {isAdvancesLoading ? (
+          <SummaryCardsSkeleton />
+        ) : allRecords.length > 0 && (
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <Card>
               <CardHeader className="pb-2">
@@ -262,7 +273,9 @@ export function AdvanceSalariesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(advanceData || []).length === 0 ? (
+                  {isAdvancesLoading ? (
+                    <TableLoadingRows rows={6} columns={6} />
+                  ) : (advanceData || []).length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={6} className="text-center text-gray-500 py-8">
                         {statusFilter

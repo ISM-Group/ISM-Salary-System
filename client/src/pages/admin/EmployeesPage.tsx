@@ -17,7 +17,7 @@ import { Link } from 'react-router-dom';
 import { Plus, Search, Eye, Pencil, Trash2, UserRound } from 'lucide-react';
 import { employeesAPI, departmentsAPI, getApiErrorMessage, getApiResourceUrl } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { TableLoadingRows } from '@/components/ui/loading-spinner';
+import { PageSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 
 // PUBLIC_INTERFACE
 /**
@@ -34,7 +34,7 @@ export function EmployeesPage() {
   const limit = 20;
 
   // Fetch departments for filter
-  const { data: departmentsData } = useQuery({
+  const { data: departmentsData, isLoading: isDepartmentsLoading } = useQuery({
     queryKey: ['departments'],
     queryFn: async () => {
       const response = await departmentsAPI.getAll();
@@ -73,6 +73,9 @@ export function EmployeesPage() {
 
   return (
     <MainLayout title="Employees" description="Manage your organization's employees">
+      {isDepartmentsLoading && isLoading ? (
+        <PageSkeleton variant="table" />
+      ) : (
       <div className="space-y-4 sm:space-y-6">
         {error && (
           <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -218,6 +221,7 @@ export function EmployeesPage() {
           />
         )}
       </div>
+      )}
     </MainLayout>
   );
 }

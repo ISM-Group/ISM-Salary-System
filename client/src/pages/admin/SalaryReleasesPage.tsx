@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { TableLoadingRows } from '@/components/ui/loading-spinner';
+import { PageSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Eye, Trash2, CheckCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
@@ -124,7 +124,7 @@ export function SalaryReleasesPage() {
     queryFn: () => salaryReleasesAPI.getById(detailId!),
   });
 
-  const { data: employeesRes } = useQuery({
+  const { data: employeesRes, isLoading: isEmployeesLoading } = useQuery({
     queryKey: ['employees-active'],
     queryFn: async () => {
       const r = await employeesAPI.getAll({ isActive: true });
@@ -132,7 +132,7 @@ export function SalaryReleasesPage() {
     },
   });
 
-  const { data: departmentsRes } = useQuery({
+  const { data: departmentsRes, isLoading: isDepartmentsLoading } = useQuery({
     queryKey: ['departments'],
     queryFn: async () => {
       const r = await departmentsAPI.getAll();
@@ -240,9 +240,14 @@ export function SalaryReleasesPage() {
       : <Badge variant="outline" className="border-yellow-300 bg-yellow-50 text-yellow-700">Draft</Badge>;
 
   const detail = detailRes?.data;
+  const isInitialLoading = isLoading && isEmployeesLoading && isDepartmentsLoading;
 
   return (
     <MainLayout title="Salary Releases" description="Manage all salary payments — daily, weekly, monthly, or custom periods">
+      {isInitialLoading ? (
+        <PageSkeleton variant="table" />
+      ) : (
+      <>
       <div className="space-y-4">
         {/* Filters + New button */}
         <div className="flex flex-wrap items-end gap-3">
@@ -652,6 +657,8 @@ export function SalaryReleasesPage() {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </MainLayout>
   );

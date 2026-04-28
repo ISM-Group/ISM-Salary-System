@@ -5,6 +5,7 @@ import { attendanceAPI, employeesAPI, departmentsAPI, rolesAPI, getApiErrorMessa
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { PageSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Search, CalendarDays, Users, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
@@ -108,29 +109,29 @@ export function AttendanceEntryPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const { data: employeesData } = useQuery({
+  const { data: employeesData, isLoading: isEmployeesLoading } = useQuery({
     queryKey: ['employees-for-attendance'],
     queryFn: async () => (await employeesAPI.getAll({ isActive: true })).data,
   });
 
-  const { data: departmentsData } = useQuery({
+  const { data: departmentsData, isLoading: isDepartmentsLoading } = useQuery({
     queryKey: ['departments'],
     queryFn: async () => (await departmentsAPI.getAll()).data,
   });
 
-  const { data: deptEmployeesData } = useQuery({
+  const { data: deptEmployeesData, isLoading: isDeptEmployeesLoading } = useQuery({
     queryKey: ['employees-by-department', departmentId],
     enabled: !!departmentId,
     queryFn: async () => (await employeesAPI.getAll({ departmentId, isActive: true })).data,
   });
 
-  const { data: rolesData } = useQuery({
+  const { data: rolesData, isLoading: isRolesLoading } = useQuery({
     queryKey: ['roles-for-attendance', departmentId],
     enabled: !!departmentId,
     queryFn: async () => (await rolesAPI.getByDepartment(departmentId)).data,
   });
 
-  const { data: dailyData, refetch } = useQuery({
+  const { data: dailyData, isLoading: isDailyLoading, refetch } = useQuery({
     queryKey: ['attendance-daily', date],
     queryFn: async () => (await attendanceAPI.getDaily(date)).data,
   });
@@ -165,6 +166,8 @@ export function AttendanceEntryPage() {
     [filteredEmployees, recordsByEmployee]
   );
   const absentCount = filteredEmployees.length - presentCount;
+  const isInitialLoading = isEmployeesLoading && isDepartmentsLoading && isDailyLoading;
+  const isTableLoading = isEmployeesLoading || isDeptEmployeesLoading || isDailyLoading || (departmentId ? isRolesLoading : false);
 
   const markAllPresent = async () => {
     const toUpdate = filteredEmployees.filter((e: any) => {
@@ -185,6 +188,9 @@ export function AttendanceEntryPage() {
 
   return (
     <MainLayout title="Attendance Entry" description="Record daily attendance for employees">
+      {isInitialLoading ? (
+        <PageSkeleton variant="table" />
+      ) : (
       <div className="space-y-5">
         {/* Filters bar */}
         <div className="glass-panel p-4">
@@ -293,7 +299,9 @@ export function AttendanceEntryPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/15 dark:divide-white/6">
-                {filteredEmployees.length === 0 ? (
+                {isTableLoading ? (
+                  <TableLoadingRows rows={8} columns={4} />
+                ) : filteredEmployees.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="px-5 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
                       {search ? 'No employees match your search.' : 'Select a department or search to view employees.'}
@@ -339,6 +347,7 @@ export function AttendanceEntryPage() {
           </div>
         </div>
       </div>
+      )}
     </MainLayout>
   );
 }

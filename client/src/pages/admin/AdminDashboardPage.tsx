@@ -15,7 +15,7 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { PageLoading } from '@/components/ui/loading-spinner';
+import { PageSkeleton } from '@/components/ui/loading-spinner';
 import { dashboardAPI } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -391,7 +391,7 @@ export function AdminDashboardPage() {
   if (isStatsLoading) {
     return (
       <MainLayout title="Dashboard" description="System analytics at a glance">
-        <PageLoading text="Loading dashboard..." />
+        <PageSkeleton variant="dashboard" />
       </MainLayout>
     );
   }

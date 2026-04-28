@@ -36,169 +36,185 @@ function toHtmlTable(rows: Record<string, unknown>[], columns: { key: string; la
 }
 
 export const exportPayroll = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { format, employeeId, from, to } = req.query as Record<string, string | undefined>;
+  try {
+    const { format, employeeId, from, to } = req.query as Record<string, string | undefined>;
 
-  let sql = `
-    SELECT sr.id, sr.employee_id AS employeeId, e.full_name AS employeeName, e.employee_id AS employeeCode,
-           sr.period_start AS periodStart, sr.period_end AS periodEnd, sr.release_type AS releaseType,
-           sr.salary_type AS salaryType, sr.gross_amount AS gross, sr.absent_deduction AS absentDeduction,
-           sr.advance_deductions AS advanceDeductions, sr.loan_deductions AS loanDeductions,
-           sr.bonus, sr.calculated_net AS calculatedNet, sr.released_amount AS releasedAmount, sr.status
-    FROM salary_releases sr
-    INNER JOIN employees e ON e.id = sr.employee_id
-    WHERE 1=1
-  `;
-  const params: unknown[] = [];
-  if (employeeId) { sql += ' AND sr.employee_id = ?'; params.push(employeeId); }
-  if (from) { sql += ' AND sr.period_start >= ?'; params.push(from); }
-  if (to) { sql += ' AND sr.period_end <= ?'; params.push(to); }
-  sql += ' ORDER BY sr.period_start DESC, e.full_name ASC';
+    let sql = `
+      SELECT sr.id, sr.employee_id AS employeeId, e.full_name AS employeeName, e.employee_id AS employeeCode,
+             sr.period_start AS periodStart, sr.period_end AS periodEnd, sr.release_type AS releaseType,
+             sr.salary_type AS salaryType, sr.gross_amount AS gross, sr.absent_deduction AS absentDeduction,
+             sr.advance_deductions AS advanceDeductions, sr.loan_deductions AS loanDeductions,
+             sr.bonus, sr.calculated_net AS calculatedNet, sr.released_amount AS releasedAmount, sr.status
+      FROM salary_releases sr
+      INNER JOIN employees e ON e.id = sr.employee_id
+      WHERE 1=1
+    `;
+    const params: unknown[] = [];
+    if (employeeId) { sql += ' AND sr.employee_id = ?'; params.push(employeeId); }
+    if (from) { sql += ' AND sr.period_start >= ?'; params.push(from); }
+    if (to) { sql += ' AND sr.period_end <= ?'; params.push(to); }
+    sql += ' ORDER BY sr.period_start DESC, e.full_name ASC';
 
-  const rows = await query<any>(sql, params);
-  const data = rows.map((r: any) => ({
-    employeeCode: r.employeeCode,
-    employeeName: r.employeeName,
-    periodStart: r.periodStart,
-    periodEnd: r.periodEnd,
-    releaseType: r.releaseType,
-    salaryType: r.salaryType,
-    gross: Number(r.gross || 0).toFixed(2),
-    absentDeduction: Number(r.absentDeduction || 0).toFixed(2),
-    advanceDeductions: Number(r.advanceDeductions || 0).toFixed(2),
-    loanDeductions: Number(r.loanDeductions || 0).toFixed(2),
-    bonus: Number(r.bonus || 0).toFixed(2),
-    calculatedNet: Number(r.calculatedNet || 0).toFixed(2),
-    releasedAmount: Number(r.releasedAmount || 0).toFixed(2),
-    status: r.status,
-  }));
+    const rows = await query<any>(sql, params);
+    const data = rows.map((r: any) => ({
+      employeeCode: r.employeeCode,
+      employeeName: r.employeeName,
+      periodStart: r.periodStart,
+      periodEnd: r.periodEnd,
+      releaseType: r.releaseType,
+      salaryType: r.salaryType,
+      gross: Number(r.gross || 0).toFixed(2),
+      absentDeduction: Number(r.absentDeduction || 0).toFixed(2),
+      advanceDeductions: Number(r.advanceDeductions || 0).toFixed(2),
+      loanDeductions: Number(r.loanDeductions || 0).toFixed(2),
+      bonus: Number(r.bonus || 0).toFixed(2),
+      calculatedNet: Number(r.calculatedNet || 0).toFixed(2),
+      releasedAmount: Number(r.releasedAmount || 0).toFixed(2),
+      status: r.status,
+    }));
 
-  const columns = [
-    { key: 'employeeCode', label: 'Employee ID' },
-    { key: 'employeeName', label: 'Employee Name' },
-    { key: 'periodStart', label: 'Period Start' },
-    { key: 'periodEnd', label: 'Period End' },
-    { key: 'releaseType', label: 'Release Type' },
-    { key: 'salaryType', label: 'Salary Type' },
-    { key: 'gross', label: 'Gross' },
-    { key: 'absentDeduction', label: 'Absent Deduction' },
-    { key: 'advanceDeductions', label: 'Advance Deductions' },
-    { key: 'loanDeductions', label: 'Loan Deductions' },
-    { key: 'bonus', label: 'Bonus' },
-    { key: 'calculatedNet', label: 'Calculated Net' },
-    { key: 'releasedAmount', label: 'Released Amount' },
-    { key: 'status', label: 'Status' },
-  ];
+    const columns = [
+      { key: 'employeeCode', label: 'Employee ID' },
+      { key: 'employeeName', label: 'Employee Name' },
+      { key: 'periodStart', label: 'Period Start' },
+      { key: 'periodEnd', label: 'Period End' },
+      { key: 'releaseType', label: 'Release Type' },
+      { key: 'salaryType', label: 'Salary Type' },
+      { key: 'gross', label: 'Gross' },
+      { key: 'absentDeduction', label: 'Absent Deduction' },
+      { key: 'advanceDeductions', label: 'Advance Deductions' },
+      { key: 'loanDeductions', label: 'Loan Deductions' },
+      { key: 'bonus', label: 'Bonus' },
+      { key: 'calculatedNet', label: 'Calculated Net' },
+      { key: 'releasedAmount', label: 'Released Amount' },
+      { key: 'status', label: 'Status' },
+    ];
 
-  if (format === 'html') {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(toHtmlTable(data, columns, 'Payroll Report'));
-    return;
+    if (format === 'html') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(toHtmlTable(data, columns, 'Payroll Report'));
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="payroll_report.csv"');
+    res.send(toCsv(data, columns));
+  } catch (error) {
+    console.error('Export payroll error:', error);
+    res.status(500).json({ error: 'Failed to generate payroll report' });
   }
-
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="payroll_report.csv"');
-  res.send(toCsv(data, columns));
 };
 
 export const exportAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { format, employeeId, from, to } = req.query as Record<string, string | undefined>;
+  try {
+    const { format, employeeId, from, to } = req.query as Record<string, string | undefined>;
 
-  let sql = `
-    SELECT a.id, a.employee_id AS employeeId, e.full_name AS employeeName, e.employee_id AS employeeCode,
-           a.date, a.status, a.notes, r.name AS roleName
-    FROM attendance a
-    INNER JOIN employees e ON e.id = a.employee_id
-    LEFT JOIN roles r ON r.id = a.role_id
-    WHERE 1=1
-  `;
-  const params: unknown[] = [];
-  if (employeeId) { sql += ' AND a.employee_id = ?'; params.push(employeeId); }
-  if (from) { sql += ' AND a.date >= ?'; params.push(from); }
-  if (to) { sql += ' AND a.date <= ?'; params.push(to); }
-  sql += ' ORDER BY a.date DESC, e.full_name ASC';
+    let sql = `
+      SELECT a.id, a.employee_id AS employeeId, e.full_name AS employeeName, e.employee_id AS employeeCode,
+             a.date, a.status, a.notes, r.name AS roleName
+      FROM attendance a
+      INNER JOIN employees e ON e.id = a.employee_id
+      LEFT JOIN roles r ON r.id = a.role_id
+      WHERE 1=1
+    `;
+    const params: unknown[] = [];
+    if (employeeId) { sql += ' AND a.employee_id = ?'; params.push(employeeId); }
+    if (from) { sql += ' AND a.date >= ?'; params.push(from); }
+    if (to) { sql += ' AND a.date <= ?'; params.push(to); }
+    sql += ' ORDER BY a.date DESC, e.full_name ASC';
 
-  const rows = await query<any>(sql, params);
-  const data = rows.map((r: any) => ({
-    employeeCode: r.employeeCode,
-    employeeName: r.employeeName,
-    date: r.date,
-    status: r.status,
-    roleName: r.roleName || '',
-    notes: r.notes || '',
-  }));
+    const rows = await query<any>(sql, params);
+    const data = rows.map((r: any) => ({
+      employeeCode: r.employeeCode,
+      employeeName: r.employeeName,
+      date: r.date,
+      status: r.status,
+      roleName: r.roleName || '',
+      notes: r.notes || '',
+    }));
 
-  const columns = [
-    { key: 'employeeCode', label: 'Employee ID' },
-    { key: 'employeeName', label: 'Employee Name' },
-    { key: 'date', label: 'Date' },
-    { key: 'status', label: 'Status' },
-    { key: 'roleName', label: 'Role Worked' },
-    { key: 'notes', label: 'Notes' },
-  ];
+    const columns = [
+      { key: 'employeeCode', label: 'Employee ID' },
+      { key: 'employeeName', label: 'Employee Name' },
+      { key: 'date', label: 'Date' },
+      { key: 'status', label: 'Status' },
+      { key: 'roleName', label: 'Role Worked' },
+      { key: 'notes', label: 'Notes' },
+    ];
 
-  if (format === 'html') {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(toHtmlTable(data, columns, 'Attendance Report'));
-    return;
+    if (format === 'html') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(toHtmlTable(data, columns, 'Attendance Report'));
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="attendance_report.csv"');
+    res.send(toCsv(data, columns));
+  } catch (error) {
+    console.error('Export attendance error:', error);
+    res.status(500).json({ error: 'Failed to generate attendance report' });
   }
-
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="attendance_report.csv"');
-  res.send(toCsv(data, columns));
 };
 
 export const exportLoans = async (req: AuthRequest, res: Response): Promise<void> => {
-  const { format, status, employeeId } = req.query as Record<string, string | undefined>;
+  try {
+    const { format, status, employeeId } = req.query as Record<string, string | undefined>;
 
-  let sql = `
-    SELECT l.id, l.employee_id AS employeeId, e.full_name AS employeeName, e.employee_id AS employeeCode,
-           l.loan_amount AS loanAmount, l.remaining_balance AS remainingBalance, l.status,
-           l.repayment_mode AS repaymentMode, l.daily_repayment_amount AS dailyRepaymentAmount,
-           l.created_at AS createdAt
-    FROM loans l
-    INNER JOIN employees e ON e.id = l.employee_id
-    WHERE 1=1
-  `;
-  const params: unknown[] = [];
-  if (employeeId) { sql += ' AND l.employee_id = ?'; params.push(employeeId); }
-  if (status) { sql += ' AND l.status = ?'; params.push(status); }
-  sql += ' ORDER BY l.created_at DESC';
+    let sql = `
+      SELECT l.id, l.employee_id AS employeeId, e.full_name AS employeeName, e.employee_id AS employeeCode,
+             l.loan_amount AS loanAmount, l.remaining_balance AS remainingBalance, l.status,
+             l.repayment_mode AS repaymentMode, l.daily_repayment_amount AS dailyRepaymentAmount,
+             l.created_at AS createdAt
+      FROM loans l
+      INNER JOIN employees e ON e.id = l.employee_id
+      WHERE 1=1
+    `;
+    const params: unknown[] = [];
+    if (employeeId) { sql += ' AND l.employee_id = ?'; params.push(employeeId); }
+    if (status) { sql += ' AND l.status = ?'; params.push(status); }
+    sql += ' ORDER BY l.created_at DESC';
 
-  const rows = await query<any>(sql, params);
-  const data = rows.map((r: any) => ({
-    employeeCode: r.employeeCode,
-    employeeName: r.employeeName,
-    loanAmount: Number(r.loanAmount || 0).toFixed(2),
-    remainingBalance: Number(r.remainingBalance || 0).toFixed(2),
-    status: r.status,
-    repaymentMode: r.repaymentMode,
-    dailyRepaymentAmount: Number(r.dailyRepaymentAmount || 0).toFixed(2),
-    createdAt: r.createdAt,
-  }));
+    const rows = await query<any>(sql, params);
+    const data = rows.map((r: any) => ({
+      employeeCode: r.employeeCode,
+      employeeName: r.employeeName,
+      loanAmount: Number(r.loanAmount || 0).toFixed(2),
+      remainingBalance: Number(r.remainingBalance || 0).toFixed(2),
+      status: r.status,
+      repaymentMode: r.repaymentMode,
+      dailyRepaymentAmount: Number(r.dailyRepaymentAmount || 0).toFixed(2),
+      createdAt: r.createdAt,
+    }));
 
-  const columns = [
-    { key: 'employeeCode', label: 'Employee ID' },
-    { key: 'employeeName', label: 'Employee Name' },
-    { key: 'loanAmount', label: 'Loan Amount' },
-    { key: 'remainingBalance', label: 'Remaining Balance' },
-    { key: 'status', label: 'Status' },
-    { key: 'repaymentMode', label: 'Repayment Mode' },
-    { key: 'dailyRepaymentAmount', label: 'Daily Repayment Amount' },
-    { key: 'createdAt', label: 'Created At' },
-  ];
+    const columns = [
+      { key: 'employeeCode', label: 'Employee ID' },
+      { key: 'employeeName', label: 'Employee Name' },
+      { key: 'loanAmount', label: 'Loan Amount' },
+      { key: 'remainingBalance', label: 'Remaining Balance' },
+      { key: 'status', label: 'Status' },
+      { key: 'repaymentMode', label: 'Repayment Mode' },
+      { key: 'dailyRepaymentAmount', label: 'Daily Repayment Amount' },
+      { key: 'createdAt', label: 'Created At' },
+    ];
 
-  if (format === 'html') {
-    res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(toHtmlTable(data, columns, 'Loan Report'));
-    return;
+    if (format === 'html') {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(toHtmlTable(data, columns, 'Loan Report'));
+      return;
+    }
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="loan_report.csv"');
+    res.send(toCsv(data, columns));
+  } catch (error) {
+    console.error('Export loans error:', error);
+    res.status(500).json({ error: 'Failed to generate loan report' });
   }
-
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', 'attachment; filename="loan_report.csv"');
-  res.send(toCsv(data, columns));
 };
 
 export const generatePayslip = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
   const { employeeId } = req.params;
   const { month } = req.query as { month?: string };
 
@@ -324,4 +340,8 @@ ${!release ? '<p style="color:#ef4444;font-size:13px;">⚠ No salary release fou
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
+  } catch (error) {
+    console.error('Generate payslip error:', error);
+    res.status(500).json({ error: 'Failed to generate payslip' });
+  }
 };

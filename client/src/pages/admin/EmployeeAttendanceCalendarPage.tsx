@@ -6,13 +6,14 @@ import { attendanceAPI } from '@/lib/api';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 
 export function EmployeeAttendanceCalendarPage() {
   const { id } = useParams<{ id: string }>();
   const [from, setFrom] = useState(new Date(new Date().setMonth(new Date().getMonth() - 1)).toISOString().slice(0, 10));
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
 
-  const { data } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['employee-attendance-calendar', id, from, to],
     enabled: !!id,
     queryFn: async () => {
@@ -25,6 +26,9 @@ export function EmployeeAttendanceCalendarPage() {
 
   return (
     <MainLayout title="Attendance Calendar" description="Detailed attendance records">
+      {isLoading && !data ? (
+        <PageSkeleton variant="table" />
+      ) : (
       <Card>
         <CardHeader>
           <CardTitle>Employee Attendance</CardTitle>
@@ -43,7 +47,9 @@ export function EmployeeAttendanceCalendarPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((row: any) => (
+              {isLoading ? (
+                <TableLoadingRows rows={6} columns={3} />
+              ) : rows.map((row: any) => (
                 <TableRow key={row.id}>
                   <TableCell>{new Date(row.date).toLocaleDateString()}</TableCell>
                   <TableCell>{row.status}</TableCell>
@@ -54,6 +60,7 @@ export function EmployeeAttendanceCalendarPage() {
           </Table>
         </CardContent>
       </Card>
+      )}
     </MainLayout>
   );
 }

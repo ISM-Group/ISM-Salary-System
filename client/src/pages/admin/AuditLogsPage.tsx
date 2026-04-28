@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Pagination } from '@/components/ui/pagination';
+import { TableLoadingRows } from '@/components/ui/loading-spinner';
 
 // PUBLIC_INTERFACE
 /**
@@ -22,7 +23,7 @@ export function AuditLogsPage() {
   const [verifying, setVerifying] = useState(false);
   const limit = 25;
 
-  const { data: responseData, refetch } = useQuery({
+  const { data: responseData, isLoading, refetch } = useQuery({
     queryKey: ['audit-logs-admin', tableFilter, verified, page, limit],
     queryFn: async () => {
       if (!verified) {
@@ -105,7 +106,9 @@ export function AuditLogsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {logs.map((row: any) => (
+                  {isLoading && verified ? (
+                    <TableLoadingRows rows={8} columns={4} />
+                  ) : logs.map((row: any) => (
                     <TableRow key={row.id}>
                       <TableCell>{row.tableName}</TableCell>
                       <TableCell>{row.action}</TableCell>
@@ -113,7 +116,7 @@ export function AuditLogsPage() {
                       <TableCell>{new Date(row.changedAt).toLocaleString()}</TableCell>
                     </TableRow>
                   ))}
-                  {logs.length === 0 && (
+                  {!isLoading && logs.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
                         No audit logs found
