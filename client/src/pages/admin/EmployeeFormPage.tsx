@@ -74,7 +74,20 @@ export function EmployeeFormPage() {
   // Clear role selection when salary type changes (the role list changes)
   useEffect(() => {
     setRoleId('');
+    setBaseSalary('');
   }, [salaryType]);
+
+  // Pre-fill baseSalary from the selected role's default wage (only on create, not edit)
+  useEffect(() => {
+    if (isEdit || !roleId || !rolesData) return;
+    const selected = (rolesData as any[]).find((r) => r.id === roleId);
+    if (!selected) return;
+    if (salaryType === 'FIXED' && selected.monthlyWage != null) {
+      setBaseSalary(String(selected.monthlyWage));
+    } else if (salaryType === 'DAILY_WAGE' && selected.dailyWage != null) {
+      setBaseSalary(String(selected.dailyWage));
+    }
+  }, [roleId, rolesData, salaryType, isEdit]);
 
   useEffect(() => {
     if (!photo) return;

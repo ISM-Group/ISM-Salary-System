@@ -30,6 +30,7 @@ export function RolesPage() {
   const [departmentId, setDepartmentId] = useState('');
   const [salaryType, setSalaryType] = useState<SalaryType>('ANY');
   const [dailyWage, setDailyWage] = useState('');
+  const [monthlyWage, setMonthlyWage] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -50,6 +51,7 @@ export function RolesPage() {
     setDepartmentId('');
     setSalaryType('ANY');
     setDailyWage('');
+    setMonthlyWage('');
     setError(null);
   };
 
@@ -59,14 +61,19 @@ export function RolesPage() {
     setDepartmentId(role.departmentId || role.department?.id || '');
     setSalaryType((role.salaryType as SalaryType) || 'ANY');
     setDailyWage(role.dailyWage != null ? String(role.dailyWage) : '');
+    setMonthlyWage(role.monthlyWage != null ? String(role.monthlyWage) : '');
   };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) { setError('Role name is required.'); return; }
     if (!departmentId) { setError('Select a department.'); return; }
-    if (salaryType !== 'FIXED' && !isNonNegativeNumber(dailyWage)) {
+    if (salaryType === 'DAILY_WAGE' && !isNonNegativeNumber(dailyWage)) {
       setError('Daily wage must be zero or more.');
+      return;
+    }
+    if (salaryType === 'FIXED' && !isNonNegativeNumber(monthlyWage)) {
+      setError('Monthly wage must be zero or more.');
       return;
     }
 
@@ -75,6 +82,7 @@ export function RolesPage() {
       departmentId,
       salaryType,
       dailyWage: salaryType === 'FIXED' ? null : (dailyWage ? Number(dailyWage) : null),
+      monthlyWage: salaryType === 'DAILY_WAGE' ? null : (monthlyWage ? Number(monthlyWage) : null),
     };
 
     setSaving(true);
@@ -131,17 +139,27 @@ export function RolesPage() {
               <select
                 className="h-10 rounded-md border border-input bg-background px-3 text-sm"
                 value={salaryType}
-                onChange={(e) => setSalaryType(e.target.value as SalaryType)}
+                onChange={(e) => { setSalaryType(e.target.value as SalaryType); setDailyWage(''); setMonthlyWage(''); }}
               >
                 <option value="ANY">Any (universal role)</option>
                 <option value="FIXED">Office — Fixed salary</option>
                 <option value="DAILY_WAGE">Site — Daily wage</option>
               </select>
 
-              {salaryType !== 'FIXED' ? (
+              {/* Wage field — branches by salary type */}
+              {salaryType === 'FIXED' ? (
                 <Input
                   type="number"
-                  placeholder="Daily wage rate"
+                  placeholder="Default monthly wage (LKR)"
+                  value={monthlyWage}
+                  min={0}
+                  step="0.01"
+                  onChange={(e) => setMonthlyWage(e.target.value)}
+                />
+              ) : salaryType === 'DAILY_WAGE' ? (
+                <Input
+                  type="number"
+                  placeholder="Daily wage rate (LKR)"
                   value={dailyWage}
                   min={0}
                   step="0.01"
@@ -149,7 +167,7 @@ export function RolesPage() {
                 />
               ) : (
                 <div className="flex h-10 items-center rounded-md border border-dashed border-input px-3 text-sm text-muted-foreground">
-                  No daily wage for fixed roles
+                  No default wage for universal roles
                 </div>
               )}
 
@@ -176,7 +194,7 @@ export function RolesPage() {
                   <TableHead>Role</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Daily Wage</TableHead>
+                  <TableHead>Default Wage</TableHead>
                   <TableHead className="w-40">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -196,11 +214,15 @@ export function RolesPage() {
                       </TableCell>
                       <TableCell>
                         {st === 'FIXED' ? (
-                          <span className="text-muted-foreground text-xs">—</span>
-                        ) : r.dailyWage ? (
-                          formatCurrency(r.dailyWage)
+                          r.monthlyWage ? (
+                            <span>{formatCurrency(r.monthlyWage)}<span className="ml-1 text-xs text-muted-foreground">/mo</span></span>
+                          ) : '-'
+                        ) : st === 'DAILY_WAGE' ? (
+                          r.dailyWage ? (
+                            <span>{formatCurrency(r.dailyWage)}<span className="ml-1 text-xs text-muted-foreground">/day</span></span>
+                          ) : '-'
                         ) : (
-                          '-'
+                          <span className="text-muted-foreground text-xs">—</span>
                         )}
                       </TableCell>
                       <TableCell>

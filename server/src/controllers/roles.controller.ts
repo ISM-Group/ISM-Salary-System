@@ -9,6 +9,7 @@ const formatRole = (r: any, department?: any) => ({
   departmentId: r.department_id,
   salaryType: r.salary_type ?? 'ANY',
   dailyWage: r.daily_wage ? parseFloat(r.daily_wage) : null,
+  monthlyWage: r.monthly_wage ? parseFloat(r.monthly_wage) : null,
   isActive: r.is_active,
   createdAt: r.created_at,
   updatedAt: r.updated_at,
@@ -102,7 +103,7 @@ export const getRole = async (req: AuthRequest, res: Response) => {
 
 export const createRole = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, departmentId, salaryType, dailyWage, isActive } = req.body;
+    const { name, departmentId, salaryType, dailyWage, monthlyWage, isActive } = req.body;
 
     if (!name || !departmentId) {
       return res.status(400).json({ error: 'Role name and department are required' });
@@ -112,13 +113,14 @@ export const createRole = async (req: AuthRequest, res: Response) => {
 
     try {
       await execute(
-        'INSERT INTO roles (id, name, department_id, salary_type, daily_wage, is_active) VALUES (?, ?, ?, ?, ?, ?)',
+        'INSERT INTO roles (id, name, department_id, salary_type, daily_wage, monthly_wage, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [
           id,
           name,
           departmentId,
           salaryType || 'ANY',
           dailyWage != null ? parseFloat(dailyWage) : null,
+          monthlyWage != null ? parseFloat(monthlyWage) : null,
           isActive !== undefined ? isActive : true,
         ]
       );
@@ -142,7 +144,7 @@ export const createRole = async (req: AuthRequest, res: Response) => {
 export const updateRole = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, salaryType, dailyWage, isActive } = req.body;
+    const { name, salaryType, dailyWage, monthlyWage, isActive } = req.body;
 
     const existing = await queryOne<{ id: string }>('SELECT id FROM roles WHERE id = ?', [id]);
     if (!existing) {
@@ -163,6 +165,10 @@ export const updateRole = async (req: AuthRequest, res: Response) => {
     if (dailyWage !== undefined) {
       updates.push('daily_wage = ?');
       params.push(dailyWage != null ? parseFloat(dailyWage) : null);
+    }
+    if (monthlyWage !== undefined) {
+      updates.push('monthly_wage = ?');
+      params.push(monthlyWage != null ? parseFloat(monthlyWage) : null);
     }
     if (isActive !== undefined) {
       updates.push('is_active = ?');

@@ -6,3 +6,7 @@
 ALTER TABLE roles
   ADD COLUMN salary_type ENUM('FIXED', 'DAILY_WAGE', 'ANY') NOT NULL DEFAULT 'ANY'
   AFTER department_id;
+
+ALTER TABLE roles
+  ADD COLUMN monthly_wage DECIMAL(12,2) NULL DEFAULT NULL
+  AFTER daily_wage;

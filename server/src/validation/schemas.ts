@@ -85,6 +85,7 @@ export const createRoleSchema = z.object({
   departmentId: uuidString,
   salaryType: z.enum(['FIXED', 'DAILY_WAGE', 'ANY']).optional().default('ANY'),
   dailyWage: z.number().min(0).nullable().optional(),
+  monthlyWage: z.number().min(0).nullable().optional(),
   isActive: z.boolean().optional().default(true),
 });
 
@@ -94,6 +95,7 @@ export const updateRoleSchema = z.object({
   level: z.string().max(50).nullable().optional(),
   salaryType: z.enum(['FIXED', 'DAILY_WAGE', 'ANY']).optional(),
   dailyWage: z.number().min(0).nullable().optional(),
+  monthlyWage: z.number().min(0).nullable().optional(),
   isActive: z.boolean().optional(),
 });
 
