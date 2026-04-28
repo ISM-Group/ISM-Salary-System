@@ -117,7 +117,7 @@ export function Header({ title, description }: HeaderProps) {
             <div className="flex h-full flex-col">
               <div className="flex h-20 items-center justify-between border-b border-white/30 px-4 py-2 dark:border-white/8">
                 <div className="flex items-center gap-2.5">
-                  <img src="/assets/ism-logo.svg" alt="ISM Group of Company" className="h-16 w-auto" />
+                  <img src="/assets/ism-logo.jpg" alt="ISM Group of Company" className="h-16 w-auto" />
                 </div>
                 <Button
                   variant="ghost"
