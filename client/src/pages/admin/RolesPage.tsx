@@ -217,10 +217,10 @@ export function RolesPage() {
                           r.monthlyWage ? (
                             <span>{formatCurrency(r.monthlyWage)}<span className="ml-1 text-xs text-muted-foreground">/mo</span></span>
                           ) : '-'
-                        ) : st === 'DAILY_WAGE' ? (
-                          r.dailyWage ? (
-                            <span>{formatCurrency(r.dailyWage)}<span className="ml-1 text-xs text-muted-foreground">/day</span></span>
-                          ) : '-'
+                        ) : r.dailyWage ? (
+                          <span>{formatCurrency(r.dailyWage)}<span className="ml-1 text-xs text-muted-foreground">/day</span></span>
+                        ) : r.monthlyWage ? (
+                          <span>{formatCurrency(r.monthlyWage)}<span className="ml-1 text-xs text-muted-foreground">/mo</span></span>
                         ) : (
                           <span className="text-muted-foreground text-xs">—</span>
                         )}

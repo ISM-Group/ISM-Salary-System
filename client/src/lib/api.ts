@@ -313,19 +313,16 @@ export const advanceSalariesAPI = {
     const response = await api.get('/advance-salaries', { params });
     return response.data;
   },
-  create: async (data: FormData) => {
-    const response = await api.post('/advance-salaries', data, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
+  create: async (data: Record<string, unknown>) => {
+    const response = await api.post('/advance-salaries', data);
     return response.data;
   },
   getByEmployee: async (employeeId: string) => {
     const response = await api.get(`/advance-salaries/employee/${employeeId}`);
     return response.data;
   },
-  /** Update the status of an advance salary (approve/reject) */
-  updateStatus: async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
-    const response = await api.put(`/advance-salaries/${id}/status`, { status });
+  delete: async (id: string) => {
+    const response = await api.delete(`/advance-salaries/${id}`);
     return response.data;
   },
 };
