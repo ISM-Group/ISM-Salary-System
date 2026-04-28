@@ -2,6 +2,18 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5002/api';
 
+export const getApiResourceUrl = (path?: string | null): string => {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  const normalizedPath = path.replace(/^\/+/, '').replace(/^api\/+/, '');
+  const url = new URL(`${API_BASE_URL.replace(/\/$/, '')}/${normalizedPath}`, window.location.origin);
+  const token = localStorage.getItem('token');
+  if (token) {
+    url.searchParams.set('token', token);
+  }
+  return url.toString();
+};
+
 type ApiFieldError = {
   field?: string;
   message?: string;

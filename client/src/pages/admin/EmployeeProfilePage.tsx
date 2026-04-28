@@ -9,9 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import {
   ArrowLeft, Edit, Loader2, Calendar, DollarSign, TrendingUp, CreditCard,
-  Wallet, Plus, CheckCircle, Trash2, ExternalLink,
+  Wallet, Plus, CheckCircle, Trash2, ExternalLink, UserRound,
 } from 'lucide-react';
-import { employeesAPI, salaryReleasesAPI, salaryHistoryAPI, loansAPI, advanceSalariesAPI, exportsAPI, getApiErrorMessage } from '@/lib/api';
+import { employeesAPI, salaryReleasesAPI, salaryHistoryAPI, loansAPI, advanceSalariesAPI, exportsAPI, getApiErrorMessage, getApiResourceUrl } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -172,6 +172,13 @@ export function EmployeeProfilePage() {
             <Button variant="ghost" size="sm" onClick={() => navigate('/admin/employees')}>
               <ArrowLeft className="h-4 w-4 mr-1" /> Back
             </Button>
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+              {employee.photoUrl ? (
+                <img src={getApiResourceUrl(employee.photoUrl)} alt={`${employee.fullName} photo`} className="h-full w-full object-cover" />
+              ) : (
+                <UserRound className="h-7 w-7 text-muted-foreground" />
+              )}
+            </div>
             <div>
               <h1 className="text-xl font-semibold">{employee.fullName}</h1>
               <p className="text-sm text-gray-500">{employee.employeeId} · {employee.department?.name} · {employee.role?.name || 'No role'}</p>
@@ -211,7 +218,6 @@ export function EmployeeProfilePage() {
             <Card>
               <CardHeader><CardTitle className="text-base">Personal Details</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-gray-500">Email</span><span>{employee.email || '-'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Phone</span><span>{employee.phone || '-'}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">Hire Date</span><span>{new Date(employee.hireDate).toLocaleDateString()}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">City</span><span>{employee.address?.city || '-'}</span></div>

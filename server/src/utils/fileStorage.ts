@@ -1,6 +1,8 @@
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 /**
  * Base directory for file uploads.
@@ -67,3 +69,130 @@ export function getUploadPath(filename: string): string {
 export function getUploadUrl(filename: string): string {
   return `uploads/${filename}`;
 }
+
+const CONTABO_FOLDER = 'ISMSalarySystem';
+let s3Client: S3Client | null = null;
+
+type StoredEmployeePhoto = {
+  key: string;
+  url: string;
+};
+
+function getS3Client(): S3Client {
+  if (s3Client) {
+    return s3Client;
+  }
+
+  const endpoint = process.env.CONTABO_S3_ENDPOINT;
+  const region = process.env.CONTABO_S3_REGION || 'default';
+  const accessKeyId = process.env.CONTABO_S3_ACCESS_KEY_ID;
+  const secretAccessKey = process.env.CONTABO_S3_SECRET_ACCESS_KEY;
+
+  if (!endpoint || !accessKeyId || !secretAccessKey) {
+    throw new Error('Contabo S3 storage is not configured');
+  }
+
+  s3Client = new S3Client({
+    endpoint,
+    region,
+    credentials: { accessKeyId, secretAccessKey },
+    forcePathStyle: process.env.CONTABO_S3_FORCE_PATH_STYLE !== 'false',
+  });
+
+  return s3Client;
+}
+
+function getBucketName(): string {
+  const bucket = process.env.CONTABO_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('CONTABO_S3_BUCKET is not configured');
+  }
+  return bucket;
+}
+
+function sanitizeFilePart(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'employee';
+}
+
+function getExtension(file: Express.Multer.File): string {
+  const originalExt = path.extname(file.originalname || '').toLowerCase();
+  if (originalExt && /^[.][a-z0-9]+$/.test(originalExt)) {
+    return originalExt;
+  }
+
+  const fromMime = file.mimetype.split('/')[1];
+  return fromMime ? `.${fromMime.replace(/[^a-z0-9]/gi, '').toLowerCase()}` : '.jpg';
+}
+
+export function buildEmployeePhotoKey(fullName: string, phone: string | null | undefined, file: Express.Multer.File): string {
+  const namePart = sanitizeFilePart(fullName);
+  const phonePart = sanitizeFilePart(phone || 'no-phone');
+  const suffix = `${Date.now()}`;
+  return `${CONTABO_FOLDER}/${namePart}-${phonePart}-${suffix}${getExtension(file)}`;
+}
+
+export function getEmployeePhotoApiUrl(employeeId: string): string {
+  return `employees/${employeeId}/photo`;
+}
+
+export async function uploadEmployeePhoto(file: Express.Multer.File, fullName: string, phone?: string | null): Promise<StoredEmployeePhoto> {
+  const key = buildEmployeePhotoKey(fullName, phone, file);
+
+  await getS3Client().send(new PutObjectCommand({
+    Bucket: getBucketName(),
+    Key: key,
+    Body: file.buffer,
+    ContentType: file.mimetype,
+  }));
+
+  return {
+    key,
+    url: getPublicObjectUrl(key),
+  };
+}
+
+export function getPublicObjectUrl(key: string): string {
+  const publicBaseUrl = process.env.CONTABO_S3_PUBLIC_BASE_URL;
+  if (publicBaseUrl) {
+    return `${publicBaseUrl.replace(/\/$/, '')}/${key}`;
+  }
+
+  const endpoint = process.env.CONTABO_S3_ENDPOINT;
+  const bucket = process.env.CONTABO_S3_BUCKET;
+  if (endpoint && bucket) {
+    return `${endpoint.replace(/\/$/, '')}/${bucket}/${key}`;
+  }
+
+  return key;
+}
+
+export async function getEmployeePhotoReadUrl(key: string): Promise<string> {
+  if (process.env.CONTABO_S3_PUBLIC_BASE_URL) {
+    return getPublicObjectUrl(key);
+  }
+
+  return getSignedUrl(
+    getS3Client(),
+    new GetObjectCommand({ Bucket: getBucketName(), Key: key }),
+    { expiresIn: Number(process.env.CONTABO_S3_SIGNED_URL_EXPIRES_SECONDS || 300) }
+  );
+}
+
+export const memoryImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: Number(process.env.EMPLOYEE_PHOTO_MAX_BYTES || 5 * 1024 * 1024),
+  },
+  fileFilter(_req, file, cb) {
+    if (!file.mimetype.startsWith('image/')) {
+      cb(new Error('Only image files are allowed'));
+      return;
+    }
+    cb(null, true);
+  },
+});

@@ -44,15 +44,9 @@ export function Sidebar() {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/30 bg-white/50 shadow-lg shadow-indigo-950/5 backdrop-blur-2xl lg:flex dark:border-white/8 dark:bg-slate-950/80">
-      <div className="flex h-16 items-center justify-between border-b border-white/25 px-4 dark:border-white/8">
+      <div className="flex h-20 items-center justify-between border-b border-white/25 px-4 py-2 dark:border-white/8">
         <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-bold text-white shadow-sm">
-            ISM
-          </div>
-          <div>
-            <span className="block text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">Salary</span>
-            <span className="text-[10px] font-medium uppercase tracking-widest text-slate-500 dark:text-slate-400">System</span>
-          </div>
+          <img src="/assets/ism-logo.svg" alt="ISM Group of Company" className="h-16 w-auto" />
         </div>
         <Button
           variant="ghost"

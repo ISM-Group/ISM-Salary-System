@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { LogIn, Moon, Shield, Sun } from 'lucide-react';
+import { LogIn, Moon, Sun } from 'lucide-react';
 import { getApiErrorMessage } from '@/lib/api';
 
 export function LoginPage() {
@@ -57,11 +57,10 @@ export function LoginPage() {
         transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 300, damping: 30 }}
       >
         <div className="mb-8 text-center sm:mb-10">
-          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-lg shadow-indigo-500/30">
-            <Shield className="h-6 w-6" strokeWidth={1.75} />
+          <div className="mb-4 inline-flex h-24 w-32 items-center justify-center">
+            <img src="/assets/ism-logo.svg" alt="ISM Group of Company" className="h-full w-full object-contain" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl">ISM Salary</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Sign in to manage payroll, attendance, and reports.</p>
+          <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">Sign in to manage payroll, attendance, and reports.</p>
         </div>
 
         <div className="glass-panel p-6 sm:p-8">

@@ -115,12 +115,9 @@ export function Header({ title, description }: HeaderProps) {
           />
           <div className="relative h-full w-72 max-w-[85vw] border-r border-white/30 bg-white/80 shadow-2xl shadow-indigo-950/20 backdrop-blur-2xl dark:border-white/8 dark:bg-slate-950/90">
             <div className="flex h-full flex-col">
-              <div className="flex h-16 items-center justify-between border-b border-white/30 px-4 dark:border-white/8">
+              <div className="flex h-20 items-center justify-between border-b border-white/30 px-4 py-2 dark:border-white/8">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-bold text-white shadow-sm">
-                    ISM
-                  </div>
-                  <span className="text-[15px] font-semibold text-slate-900 dark:text-slate-100">Salary System</span>
+                  <img src="/assets/ism-logo.svg" alt="ISM Group of Company" className="h-16 w-auto" />
                 </div>
                 <Button
                   variant="ghost"

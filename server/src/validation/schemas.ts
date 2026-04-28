@@ -28,7 +28,7 @@ export const loginSchema = z.object({
 
 // PUBLIC_INTERFACE
 export const createEmployeeSchema = z.object({
-  employeeId: z.string().min(1, 'Employee ID is required').max(50),
+  employeeId: z.string().min(1).max(50).optional(),
   fullName: z.string().min(1, 'Full name is required').max(150),
   email: z.preprocess(blankToNull, z.string().email('Invalid email format').max(150).nullable().optional()),
   phone: z.preprocess(blankToNull, z.string().max(30).nullable().optional()),

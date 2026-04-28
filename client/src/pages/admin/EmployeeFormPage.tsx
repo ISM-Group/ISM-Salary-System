@@ -1,15 +1,17 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { departmentsAPI, employeesAPI, getApiErrorMessage, getApiFieldErrors, rolesAPI } from '@/lib/api';
+import { departmentsAPI, employeesAPI, getApiErrorMessage, getApiFieldErrors, getApiResourceUrl, rolesAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FormErrors, isEmail, isIsoDate } from '@/lib/formValidation';
+import { FormErrors, isIsoDate } from '@/lib/formValidation';
 import { useToast } from '@/hooks/use-toast';
+import { Camera, ImagePlus, UserRound, X } from 'lucide-react';
 
-type EmployeeFormField = 'employeeId' | 'fullName' | 'email' | 'departmentId' | 'hireDate' | 'form';
+type EmployeeFormField = 'fullName' | 'departmentId' | 'hireDate' | 'photo' | 'form';
 
 export function EmployeeFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -18,11 +20,12 @@ export function EmployeeFormPage() {
 
   const [employeeId, setEmployeeId] = useState('');
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [departmentId, setDepartmentId] = useState('');
   const [roleId, setRoleId] = useState('');
   const [hireDate, setHireDate] = useState(new Date().toISOString().slice(0, 10));
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState('');
   const [errors, setErrors] = useState<FormErrors<EmployeeFormField>>({});
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
@@ -50,19 +53,40 @@ export function EmployeeFormPage() {
     }
     setEmployeeId(employeeData.employeeId || '');
     setFullName(employeeData.fullName || '');
-    setEmail(employeeData.email || '');
     setPhone(employeeData.phone || '');
     setDepartmentId(employeeData.departmentId || '');
     setRoleId(employeeData.roleId || '');
     setHireDate(employeeData.hireDate ? String(employeeData.hireDate).slice(0, 10) : new Date().toISOString().slice(0, 10));
+    setPhotoPreview(employeeData.photoUrl ? getApiResourceUrl(employeeData.photoUrl) : '');
   }, [employeeData]);
+
+  useEffect(() => {
+    if (!photo) {
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(photo);
+    setPhotoPreview(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [photo]);
+
+  const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setErrors((current) => ({ ...current, photo: 'Select an image file.' }));
+      return;
+    }
+    setErrors((current) => ({ ...current, photo: undefined }));
+    setPhoto(file);
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const nextErrors: FormErrors<EmployeeFormField> = {};
-    if (!employeeId.trim()) nextErrors.employeeId = 'Employee ID is required.';
     if (!fullName.trim()) nextErrors.fullName = 'Full name is required.';
-    if (email.trim() && !isEmail(email.trim())) nextErrors.email = 'Enter a valid email address.';
     if (!departmentId) nextErrors.departmentId = 'Select a department.';
     if (!isIsoDate(hireDate)) nextErrors.hireDate = 'Select a valid hire date.';
 
@@ -71,15 +95,15 @@ export function EmployeeFormPage() {
       return;
     }
 
-    const payload = {
-      employeeId: employeeId.trim(),
-      fullName: fullName.trim(),
-      email: email.trim() || null,
-      phone: phone.trim() || null,
-      departmentId,
-      roleId: roleId || null,
-      hireDate,
-    };
+    const payload = new FormData();
+    payload.append('fullName', fullName.trim());
+    payload.append('phone', phone.trim());
+    payload.append('departmentId', departmentId);
+    payload.append('roleId', roleId || '');
+    payload.append('hireDate', hireDate);
+    if (photo) {
+      payload.append('photo', photo);
+    }
 
     setSaving(true);
     try {
@@ -112,22 +136,26 @@ export function EmployeeFormPage() {
                 {errors.form}
               </p>
             )}
-            <div>
-              <Input value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} placeholder="Employee ID" required />
-              {errors.employeeId && <p className="mt-1 text-xs text-red-600">{errors.employeeId}</p>}
-            </div>
-            <div>
-              <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Full name" required />
+            {isEdit && (
+              <div>
+                <Label htmlFor="employeeId">Employee ID</Label>
+                <Input id="employeeId" value={employeeId} readOnly className="mt-1 bg-muted font-mono" />
+              </div>
+            )}
+            <div className={isEdit ? '' : 'md:col-span-2'}>
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1" required />
               {errors.fullName && <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>}
             </div>
             <div>
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
-              {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
+              <Label htmlFor="phone">Phone</Label>
+              <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1" />
             </div>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone" />
             <div>
+              <Label htmlFor="departmentId">Department</Label>
               <select
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                id="departmentId"
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={departmentId}
                 onChange={(e) => setDepartmentId(e.target.value)}
                 required
@@ -141,23 +169,68 @@ export function EmployeeFormPage() {
               </select>
               {errors.departmentId && <p className="mt-1 text-xs text-red-600">{errors.departmentId}</p>}
             </div>
-            <select
-              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
-              value={roleId}
-              onChange={(e) => setRoleId(e.target.value)}
-            >
-              <option value="">Role (optional)</option>
-              {(rolesData || []).map((r: any) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
             <div>
-              <Input type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} required />
+              <Label htmlFor="roleId">Role</Label>
+              <select
+                id="roleId"
+                className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={roleId}
+                onChange={(e) => setRoleId(e.target.value)}
+              >
+                <option value="">Role (optional)</option>
+                {(rolesData || []).map((r: any) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="hireDate">Hire Date</Label>
+              <Input id="hireDate" type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} className="mt-1" required />
               {errors.hireDate && <p className="mt-1 text-xs text-red-600">{errors.hireDate}</p>}
             </div>
-            <Button type="submit" disabled={saving}>{saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Employee'}</Button>
+            <div className="md:col-span-2">
+              <Label>Employee Photo</Label>
+              <div className="mt-2 flex flex-col gap-3 rounded-md border border-border p-3 sm:flex-row sm:items-center">
+                <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                  {photoPreview ? (
+                    <img src={photoPreview} alt={`${fullName || 'Employee'} photo`} className="h-full w-full object-cover" />
+                  ) : (
+                    <UserRound className="h-10 w-10 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex flex-1 flex-wrap gap-2">
+                  <input id="photo-upload" type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+                  <input id="photo-camera" type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoChange} />
+                  <Button type="button" variant="outline" onClick={() => document.getElementById('photo-upload')?.click()}>
+                    <ImagePlus className="h-4 w-4" />
+                    Upload Photo
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => document.getElementById('photo-camera')?.click()}>
+                    <Camera className="h-4 w-4" />
+                    Take Photo
+                  </Button>
+                  {photo && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setPhoto(null);
+                        setPhotoPreview(employeeData?.photoUrl ? getApiResourceUrl(employeeData.photoUrl) : '');
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {errors.photo && <p className="mt-1 text-xs text-red-600">{errors.photo}</p>}
+            </div>
+            <Button type="submit" disabled={saving} className="md:col-span-2 justify-self-start">
+              {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Employee'}
+            </Button>
           </form>
         </CardContent>
       </Card>

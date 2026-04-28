@@ -2,6 +2,17 @@ import { Response } from 'express';
 import { execute, generateId, query, queryOne } from '../utils/db';
 import { AuthRequest } from '../types';
 import { parsePagination, buildPaginationMeta } from '../utils/pagination';
+import { getEmployeePhotoApiUrl, getEmployeePhotoReadUrl, uploadEmployeePhoto } from '../utils/fileStorage';
+
+async function generateEmployeeCode(): Promise<string> {
+  const row = await queryOne<{ maxNumber: number | null }>(
+    `SELECT MAX(CAST(SUBSTRING(employee_id, 4) AS UNSIGNED)) AS maxNumber
+     FROM employees
+     WHERE employee_id REGEXP '^EMP[0-9]+$'`
+  );
+  const nextNumber = Number(row?.maxNumber || 0) + 1;
+  return `EMP${String(nextNumber).padStart(3, '0')}`;
+}
 
 /**
  * GET /employees
@@ -33,6 +44,8 @@ export const getEmployees = async (req: AuthRequest, res: Response): Promise<voi
       e.address_line2 as addressLine2,
       e.city,
       e.region,
+      e.photo_url as photoUrl,
+      e.photo_key as photoKey,
       d.id as departmentId,
       d.name as departmentName,
       r.id as roleId,
@@ -85,6 +98,7 @@ export const getEmployees = async (req: AuthRequest, res: Response): Promise<voi
       fullName: row.fullName,
       email: row.email,
       phone: row.phone,
+      photoUrl: row.photoKey ? getEmployeePhotoApiUrl(row.id) : row.photoUrl,
       salaryType: row.salaryType,
       baseSalary: row.baseSalary ? Number(row.baseSalary) : null,
       hireDate: row.hireDate,
@@ -125,6 +139,8 @@ export const getEmployee = async (req: AuthRequest, res: Response): Promise<void
       e.address_line2 as addressLine2,
       e.city,
       e.region,
+      e.photo_url as photoUrl,
+      e.photo_key as photoKey,
       d.id as departmentId,
       d.name as departmentName,
       r.id as roleId,
@@ -145,6 +161,7 @@ export const getEmployee = async (req: AuthRequest, res: Response): Promise<void
   res.json({
     data: {
       ...result,
+      photoUrl: result.photoKey ? getEmployeePhotoApiUrl(result.id) : result.photoUrl,
       baseSalary: result.baseSalary ? Number(result.baseSalary) : null,
       isActive: !!result.isActive,
     },
@@ -154,12 +171,11 @@ export const getEmployee = async (req: AuthRequest, res: Response): Promise<void
 /**
  * POST /employees
  * Creates a new employee record.
- * Required fields: employeeId, fullName, departmentId, hireDate.
+ * Required fields: fullName, departmentId, hireDate.
  */
 // PUBLIC_INTERFACE
 export const createEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
   const {
-    employeeId,
     fullName,
     email,
     phone,
@@ -175,17 +191,22 @@ export const createEmployee = async (req: AuthRequest, res: Response): Promise<v
     region,
   } = req.body as Record<string, unknown>;
 
-  if (!employeeId || !fullName || !departmentId || !hireDate) {
-    res.status(400).json({ error: 'employeeId, fullName, departmentId and hireDate are required' });
+  if (!fullName || !departmentId || !hireDate) {
+    res.status(400).json({ error: 'fullName, departmentId and hireDate are required' });
     return;
   }
 
   const id = generateId();
+  const employeeId = await generateEmployeeCode();
+  const storedPhoto = req.file
+    ? await uploadEmployeePhoto(req.file, String(fullName), phone ? String(phone) : null)
+    : null;
+
   await execute(
     `INSERT INTO employees (
       id, employee_id, full_name, email, phone, department_id, role_id, hire_date,
-      salary_type, base_salary, is_active, address_line1, address_line2, city, region, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      salary_type, base_salary, is_active, address_line1, address_line2, city, region, photo_url, photo_key, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
     [
       id,
       employeeId,
@@ -202,10 +223,12 @@ export const createEmployee = async (req: AuthRequest, res: Response): Promise<v
       addressLine2 || null,
       city || null,
       region || null,
+      storedPhoto?.url || null,
+      storedPhoto?.key || null,
     ]
   );
 
-  const created = await queryOne('SELECT id FROM employees WHERE id = ?', [id]);
+  const created = await queryOne('SELECT id, employee_id as employeeId FROM employees WHERE id = ?', [id]);
   res.status(201).json({ data: created });
 };
 
@@ -221,7 +244,10 @@ export const createEmployee = async (req: AuthRequest, res: Response): Promise<v
  */
 // PUBLIC_INTERFACE
 export const updateEmployee = async (req: AuthRequest, res: Response): Promise<void> => {
-  const existing = await queryOne<{ id: string }>('SELECT id FROM employees WHERE id = ?', [req.params.id]);
+  const existing = await queryOne<{ id: string; fullName: string; phone: string | null }>(
+    'SELECT id, full_name as fullName, phone FROM employees WHERE id = ?',
+    [req.params.id]
+  );
   if (!existing) {
     res.status(404).json({ error: 'Employee not found' });
     return;
@@ -257,6 +283,16 @@ export const updateEmployee = async (req: AuthRequest, res: Response): Promise<v
     }
   }
 
+  if (req.file) {
+    const storedPhoto = await uploadEmployeePhoto(
+      req.file,
+      String(payload.fullName || existing.fullName),
+      payload.phone !== undefined ? String(payload.phone || '') : existing.phone
+    );
+    setClauses.push('photo_url = ?', 'photo_key = ?');
+    params.push(storedPhoto.url, storedPhoto.key);
+  }
+
   // If no updatable fields were provided, return early
   if (setClauses.length === 0) {
     res.status(400).json({ error: 'No updatable fields provided' });
@@ -286,7 +322,7 @@ export const getEmployeeProfile = async (req: AuthRequest, res: Response): Promi
     `SELECT
       e.id, e.employee_id as employeeId, e.full_name as fullName, e.email, e.phone, e.hire_date as hireDate,
       e.salary_type as salaryType, e.base_salary as baseSalary, e.is_active as isActive,
-      e.address_line1, e.address_line2, e.city, e.region,
+      e.address_line1, e.address_line2, e.city, e.region, e.photo_url as photoUrl, e.photo_key as photoKey,
       d.id as department_id, d.name as department_name,
       r.id as role_id, r.name as role_name, r.daily_wage as role_daily_wage
     FROM employees e
@@ -351,6 +387,7 @@ export const getEmployeeProfile = async (req: AuthRequest, res: Response): Promi
         fullName: employee.fullName,
         email: employee.email,
         phone: employee.phone,
+        photoUrl: employee.photoKey ? getEmployeePhotoApiUrl(employee.id) : employee.photoUrl,
         hireDate: employee.hireDate,
         salaryType: employee.salaryType,
         baseSalary: employee.baseSalary ? Number(employee.baseSalary) : null,
@@ -391,6 +428,33 @@ export const getEmployeeProfile = async (req: AuthRequest, res: Response): Promi
       },
     },
   });
+};
+
+/**
+ * GET /employees/:id/photo
+ * Redirects to a readable Contabo object URL for the employee photo.
+ */
+// PUBLIC_INTERFACE
+export const getEmployeePhoto = async (req: AuthRequest, res: Response): Promise<void> => {
+  const employee = await queryOne<{ id: string; photoKey: string | null; photoUrl: string | null }>(
+    `SELECT id, photo_key as photoKey, photo_url as photoUrl
+     FROM employees
+     WHERE id = ?`,
+    [req.params.id]
+  );
+
+  if (!employee) {
+    res.status(404).json({ error: 'Employee not found' });
+    return;
+  }
+
+  if (!employee.photoKey && !employee.photoUrl) {
+    res.status(404).json({ error: 'Employee photo not found' });
+    return;
+  }
+
+  const url = employee.photoKey ? await getEmployeePhotoReadUrl(employee.photoKey) : employee.photoUrl!;
+  res.redirect(url);
 };
 
 /**

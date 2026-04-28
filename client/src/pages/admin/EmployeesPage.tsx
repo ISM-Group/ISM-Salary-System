@@ -14,8 +14,8 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/pagination';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Eye, Pencil, Loader2, Trash2 } from 'lucide-react';
-import { employeesAPI, departmentsAPI, getApiErrorMessage } from '@/lib/api';
+import { Plus, Search, Eye, Pencil, Loader2, Trash2, UserRound } from 'lucide-react';
+import { employeesAPI, departmentsAPI, getApiErrorMessage, getApiResourceUrl } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 // PUBLIC_INTERFACE
@@ -146,9 +146,15 @@ export function EmployeesPage() {
                   <TableRow key={employee.id} className="group">
                     <TableCell className="font-mono text-sm">{employee.employeeId}</TableCell>
                     <TableCell>
-                      <div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                          {employee.photoUrl ? (
+                            <img src={getApiResourceUrl(employee.photoUrl)} alt={`${employee.fullName} photo`} className="h-full w-full object-cover" />
+                          ) : (
+                            <UserRound className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
                         <p className="font-medium">{employee.fullName}</p>
-                        <p className="text-xs text-muted-foreground">{employee.email}</p>
                       </div>
                     </TableCell>
                     <TableCell>{employee.department?.name || '-'}</TableCell>

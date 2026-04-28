@@ -14,6 +14,7 @@ import {
   createEmployee,
   deleteEmployee,
   getEmployee,
+  getEmployeePhoto,
   getEmployeeProfile,
   getEmployees,
   updateEmployee,
@@ -25,6 +26,7 @@ import { createEmployeeSchema, updateEmployeeSchema } from '../validation/schema
 import { UserRole } from '../types';
 import { auditLog } from '../middleware/auditLog.middleware';
 import { AuditAction } from '../utils/auditLog';
+import { memoryImageUpload } from '../utils/fileStorage';
 
 const router = Router();
 
@@ -32,14 +34,29 @@ router.use(authenticate);
 
 // Read endpoints — both ADMIN and MANAGER
 router.get('/', getEmployees);
+router.get('/:id/photo', getEmployeePhoto);
 router.get('/:id', getEmployee);
 router.get('/:id/profile', getEmployeeProfile);
 
 // Create — both ADMIN and MANAGER with validation
-router.post('/', authorize(UserRole.ADMIN, UserRole.MANAGER), validate(createEmployeeSchema), auditLog('employees', AuditAction.CREATE), createEmployee);
+router.post(
+  '/',
+  authorize(UserRole.ADMIN, UserRole.MANAGER),
+  memoryImageUpload.single('photo'),
+  validate(createEmployeeSchema),
+  auditLog('employees', AuditAction.CREATE),
+  createEmployee
+);
 
 // Update and delete — ADMIN only with validation
-router.put('/:id', authorize(UserRole.ADMIN), validate(updateEmployeeSchema), auditLog('employees', AuditAction.UPDATE), updateEmployee);
+router.put(
+  '/:id',
+  authorize(UserRole.ADMIN),
+  memoryImageUpload.single('photo'),
+  validate(updateEmployeeSchema),
+  auditLog('employees', AuditAction.UPDATE),
+  updateEmployee
+);
 router.delete('/:id', authorize(UserRole.ADMIN), auditLog('employees', AuditAction.DELETE), deleteEmployee);
 
 export default router;

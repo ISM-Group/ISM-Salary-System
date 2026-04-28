@@ -1,0 +1,27 @@
+<svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Black background -->
+  <rect width="400" height="300" fill="#000000"/>
+  
+  <!-- ISM Text -->
+  <text x="200" y="140" font-family="Georgia, serif" font-size="120" font-weight="bold" fill="#D4AF7A" text-anchor="middle" letter-spacing="5">
+    ISM
+  </text>
+  
+  <!-- Decorative dots -->
+  <circle cx="60" cy="180" r="4" fill="#D4AF7A"/>
+  <circle cx="80" cy="180" r="4" fill="#D4AF7A"/>
+  <circle cx="100" cy="180" r="4" fill="#D4AF7A"/>
+  <circle cx="120" cy="180" r="4" fill="#D4AF7A"/>
+  <circle cx="140" cy="180" r="4" fill="#D4AF7A"/>
+  
+  <circle cx="260" cy="180" r="4" fill="#D4AF7A"/>
+  <circle cx="280" cy="180" r="4" fill="#D4AF7A"/>
+  <circle cx="300" cy="180" r="4" fill="#D4AF7A"/>
+  <circle cx="320" cy="180" r="4" fill="#D4AF7A"/>
+  <circle cx="340" cy="180" r="4" fill="#D4AF7A"/>
+  
+  <!-- Group of Company text -->
+  <text x="200" y="215" font-family="Georgia, serif" font-size="28" fill="#D4AF7A" text-anchor="middle" letter-spacing="2">
+    Group of Company
+  </text>
+</svg>
