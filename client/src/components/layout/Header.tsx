@@ -1,8 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/contexts/ThemeContext';
-import { Bell, Menu, Moon, Sun } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { NavLink, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -42,7 +41,7 @@ interface HeaderProps {
 
 export function Header({ title, description }: HeaderProps) {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
   const location = useLocation();
@@ -50,54 +49,89 @@ export function Header({ title, description }: HeaderProps) {
 
   const visibleNavItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
+  // Update time every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(timer);
+  }, []);
+
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  // Format date and time
+  const formatDate = () => {
+    return currentTime.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const formatTime = () => {
+    return currentTime.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-border bg-background/92 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/82">
-        <div className="mx-auto flex h-16 max-w-[2000px] items-center justify-between px-4 sm:px-6">
-          <div className="flex items-center gap-3">
-            {isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsMobileMenuOpen(true)}
-                className="cursor-pointer lg:hidden"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-            )}
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate text-lg font-semibold text-foreground sm:text-xl">
-                {title}
-              </h1>
-              {description && (
-                <p className="mt-0.5 hidden truncate text-xs text-muted-foreground sm:block">{description}</p>
-              )}
+        <div className="mx-auto max-w-[2000px] px-4 sm:px-6">
+          {/* Time and Date Section */}
+          <div className="flex items-center justify-between border-b border-border/50 py-2">
+            <div className="text-sm text-muted-foreground">
+              <span>{formatDate()}</span>
+              <span className="mx-2">•</span>
+              <span>{formatTime()}</span>
+            </div>
+            <div className="text-sm font-medium text-foreground">
+              {getGreeting()}, {user?.full_name?.split(' ')[0]}!
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleTheme}
-              className="cursor-pointer text-muted-foreground hover:text-foreground"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
-
-            <Button variant="ghost" size="icon" className="relative hidden cursor-pointer text-muted-foreground hover:text-foreground sm:flex">
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-accent" />
-            </Button>
-
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 cursor-default items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground sm:h-9 sm:w-9 sm:text-sm dark:bg-accent dark:text-accent-foreground">
-                {user?.full_name?.charAt(0).toUpperCase()}
+          {/* Main Header Content */}
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-3">
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsMobileMenuOpen(true)}
+                  className="cursor-pointer lg:hidden"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              )}
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-lg font-semibold text-foreground sm:text-xl">
+                  {title}
+                </h1>
+                {description && (
+                  <p className="mt-0.5 hidden truncate text-xs text-muted-foreground sm:block">{description}</p>
+                )}
               </div>
-              <div className="hidden sm:block">
-                <p className="text-sm font-medium text-foreground">{user?.full_name}</p>
-                <p className="text-xs capitalize text-muted-foreground">{user?.role?.toLowerCase()}</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 cursor-default items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground sm:h-9 sm:w-9 sm:text-sm dark:bg-accent dark:text-accent-foreground">
+                  {user?.full_name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="hidden sm:block">
+                  <p className="text-sm font-medium text-foreground">{user?.full_name}</p>
+                  <p className="text-xs capitalize text-muted-foreground">{user?.role?.toLowerCase()}</p>
+                </div>
               </div>
             </div>
           </div>
@@ -119,14 +153,6 @@ export function Header({ title, description }: HeaderProps) {
                 <div className="flex items-center gap-2.5">
                   <img src="/assets/ism-logo.png" alt="ISM Group of Company" className="h-16 w-auto" />
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleTheme}
-                  className="cursor-pointer text-sidebar-muted hover:text-sidebar-foreground"
-                >
-                  {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                </Button>
               </div>
 
               <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
