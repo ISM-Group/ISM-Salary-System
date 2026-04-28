@@ -71,11 +71,13 @@ export function EmployeeFormPage() {
     setPhotoPreview(employeeData.photoUrl ? getApiResourceUrl(employeeData.photoUrl) : '');
   }, [employeeData]);
 
-  // Clear role selection when salary type changes (the role list changes)
+  // On create: clear role and salary when type changes so stale values don't carry over.
+  // On edit: skip — salaryType is being restored from loaded data, not changed by the user.
   useEffect(() => {
+    if (isEdit) return;
     setRoleId('');
     setBaseSalary('');
-  }, [salaryType]);
+  }, [salaryType, isEdit]);
 
   // Pre-fill baseSalary from the selected role's default wage (only on create, not edit)
   useEffect(() => {
