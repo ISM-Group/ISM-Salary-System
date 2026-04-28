@@ -46,7 +46,7 @@ export function Sidebar() {
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar shadow-card lg:flex">
       <div className="flex h-20 items-center justify-between border-b border-sidebar-border px-4 py-2">
         <div className="flex items-center gap-2.5">
-          <img src="/assets/ism-logo.jpg" alt="ISM Group of Company" className="h-16 w-auto" />
+          <img src="/assets/ism-logo.png" alt="ISM Group of Company" className="h-16 w-auto" />
         </div>
         <Button
           variant="ghost"

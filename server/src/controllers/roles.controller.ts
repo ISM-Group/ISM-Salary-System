@@ -2,9 +2,22 @@ import { Response } from 'express';
 import { query, queryOne, execute, generateId } from '../utils/db';
 import { AuthRequest } from '../types';
 
+const formatRole = (r: any, department?: any) => ({
+  id: r.id,
+  name: r.name,
+  level: r.level || null,
+  departmentId: r.department_id,
+  salaryType: r.salary_type ?? 'ANY',
+  dailyWage: r.daily_wage ? parseFloat(r.daily_wage) : null,
+  isActive: r.is_active,
+  createdAt: r.created_at,
+  updatedAt: r.updated_at,
+  ...(department !== undefined && { department }),
+});
+
 export const getRoles = async (req: AuthRequest, res: Response) => {
   try {
-    const { departmentId } = req.query;
+    const { departmentId, salaryType } = req.query;
 
     let sql = `
       SELECT r.*, d.id as dept_id, d.name as dept_name, d.description as dept_description,
@@ -13,34 +26,32 @@ export const getRoles = async (req: AuthRequest, res: Response) => {
       INNER JOIN departments d ON r.department_id = d.id
     `;
     const params: any[] = [];
+    const conditions: string[] = [];
 
     if (departmentId) {
-      sql += ' WHERE r.department_id = ?';
+      conditions.push('r.department_id = ?');
       params.push(departmentId);
     }
+    // salaryType filter: return exact match OR 'ANY' roles
+    if (salaryType && salaryType !== 'ANY') {
+      conditions.push("(r.salary_type = ? OR r.salary_type = 'ANY')");
+      params.push(salaryType);
+    }
 
+    if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
     sql += ' ORDER BY r.name ASC';
 
     const roles = await query<any>(sql, params);
 
-    // Transform to match expected format
-    const formattedRoles = roles.map((r: any) => ({
-      id: r.id,
-      name: r.name,
-      level: r.level || null,
-      departmentId: r.department_id,
-      dailyWage: r.daily_wage ? parseFloat(r.daily_wage) : null,
-      isActive: r.is_active,
-      createdAt: r.created_at,
-      updatedAt: r.updated_at,
-      department: {
+    const formattedRoles = roles.map((r: any) =>
+      formatRole(r, {
         id: r.dept_id,
         name: r.dept_name,
         description: r.dept_description,
         createdAt: r.dept_created_at,
         updatedAt: r.dept_updated_at,
-      },
-    }));
+      })
+    );
 
     res.json({ data: formattedRoles });
   } catch (error) {
@@ -52,21 +63,20 @@ export const getRoles = async (req: AuthRequest, res: Response) => {
 export const getRolesByDepartment = async (req: AuthRequest, res: Response) => {
   try {
     const { departmentId } = req.params;
+    const { salaryType } = req.query;
 
-    const roles = await query<{
-      id: string;
-      department_id: string;
-      name: string;
-      daily_wage: number | null;
-      is_active: boolean;
-      created_at: Date;
-      updated_at: Date;
-    }>(
-      'SELECT * FROM roles WHERE department_id = ? AND is_active = TRUE ORDER BY name ASC',
-      [departmentId]
-    );
+    let sql = 'SELECT * FROM roles WHERE department_id = ? AND is_active = TRUE';
+    const params: any[] = [departmentId];
 
-    res.json({ data: roles });
+    if (salaryType && salaryType !== 'ANY') {
+      sql += " AND (salary_type = ? OR salary_type = 'ANY')";
+      params.push(salaryType);
+    }
+
+    sql += ' ORDER BY name ASC';
+
+    const roles = await query<any>(sql, params);
+    res.json({ data: roles.map((r: any) => formatRole(r)) });
   } catch (error) {
     console.error('Get roles by department error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -77,40 +87,13 @@ export const getRole = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    const role = await queryOne<{
-      id: string;
-      department_id: string;
-      name: string;
-      level: string | null;
-      daily_wage: number | null;
-      is_active: boolean;
-      created_at: Date;
-      updated_at: Date;
-    }>('SELECT * FROM roles WHERE id = ?', [id]);
-
+    const role = await queryOne<any>('SELECT * FROM roles WHERE id = ?', [id]);
     if (!role) {
       return res.status(404).json({ error: 'Role not found' });
     }
 
-    // Get department
-    const department = await queryOne<{
-      id: string;
-      name: string;
-      description: string | null;
-      created_at: Date;
-      updated_at: Date;
-    }>('SELECT * FROM departments WHERE id = ?', [role.department_id]);
-
-    res.json({
-      data: {
-        ...role,
-        departmentId: role.department_id,
-        level: role.level || null,
-        dailyWage: role.daily_wage ? parseFloat(role.daily_wage.toString()) : null,
-        isActive: role.is_active,
-        department,
-      },
-    });
+    const department = await queryOne<any>('SELECT * FROM departments WHERE id = ?', [role.department_id]);
+    res.json({ data: formatRole(role, department) });
   } catch (error) {
     console.error('Get role error:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -119,7 +102,7 @@ export const getRole = async (req: AuthRequest, res: Response) => {
 
 export const createRole = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, level, departmentId, dailyWage, isActive } = req.body;
+    const { name, departmentId, salaryType, dailyWage, isActive } = req.body;
 
     if (!name || !departmentId) {
       return res.status(400).json({ error: 'Role name and department are required' });
@@ -128,32 +111,22 @@ export const createRole = async (req: AuthRequest, res: Response) => {
     const id = generateId();
 
     try {
-      // Insert without level column since it doesn't exist in the database
       await execute(
-        'INSERT INTO roles (id, name, department_id, daily_wage, is_active) VALUES (?, ?, ?, ?, ?)',
+        'INSERT INTO roles (id, name, department_id, salary_type, daily_wage, is_active) VALUES (?, ?, ?, ?, ?, ?)',
         [
           id,
           name,
           departmentId,
-          dailyWage ? parseFloat(dailyWage) : null,
+          salaryType || 'ANY',
+          dailyWage != null ? parseFloat(dailyWage) : null,
           isActive !== undefined ? isActive : true,
         ]
       );
 
-      // Get role with department
       const role = await queryOne<any>('SELECT * FROM roles WHERE id = ?', [id]);
       const department = await queryOne<any>('SELECT * FROM departments WHERE id = ?', [departmentId]);
 
-      res.status(201).json({
-        data: {
-          ...role,
-          departmentId: role.department_id,
-          level: role.level || null,
-          dailyWage: role.daily_wage ? parseFloat(role.daily_wage.toString()) : null,
-          isActive: role.is_active,
-          department,
-        },
-      });
+      res.status(201).json({ data: formatRole(role, department) });
     } catch (error: any) {
       if (error.code === 'ER_DUP_ENTRY') {
         return res.status(400).json({ error: 'Role with this name already exists in this department' });
@@ -169,15 +142,13 @@ export const createRole = async (req: AuthRequest, res: Response) => {
 export const updateRole = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, level, dailyWage, isActive } = req.body;
+    const { name, salaryType, dailyWage, isActive } = req.body;
 
-    // Check if role exists
     const existing = await queryOne<{ id: string }>('SELECT id FROM roles WHERE id = ?', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Role not found' });
     }
 
-    // Build update query dynamically
     const updates: string[] = [];
     const params: any[] = [];
 
@@ -185,15 +156,13 @@ export const updateRole = async (req: AuthRequest, res: Response) => {
       updates.push('name = ?');
       params.push(name);
     }
-    // Skip level update since column doesn't exist in DB
-    // If you add the column later, uncomment this:
-    // if (level !== undefined) {
-    //   updates.push('level = ?');
-    //   params.push(level || null);
-    // }
+    if (salaryType !== undefined) {
+      updates.push('salary_type = ?');
+      params.push(salaryType);
+    }
     if (dailyWage !== undefined) {
       updates.push('daily_wage = ?');
-      params.push(dailyWage ? parseFloat(dailyWage) : null);
+      params.push(dailyWage != null ? parseFloat(dailyWage) : null);
     }
     if (isActive !== undefined) {
       updates.push('is_active = ?');
@@ -201,19 +170,9 @@ export const updateRole = async (req: AuthRequest, res: Response) => {
     }
 
     if (updates.length === 0) {
-      // No updates, just return existing
       const role = await queryOne<any>('SELECT * FROM roles WHERE id = ?', [id]);
       const department = await queryOne<any>('SELECT * FROM departments WHERE id = ?', [role.department_id]);
-      return res.json({
-        data: {
-          ...role,
-          departmentId: role.department_id,
-          level: role.level || null,
-          dailyWage: role.daily_wage ? parseFloat(role.daily_wage.toString()) : null,
-          isActive: role.is_active,
-          department,
-        },
-      });
+      return res.json({ data: formatRole(role, department) });
     }
 
     params.push(id);
@@ -224,16 +183,7 @@ export const updateRole = async (req: AuthRequest, res: Response) => {
       const role = await queryOne<any>('SELECT * FROM roles WHERE id = ?', [id]);
       const department = await queryOne<any>('SELECT * FROM departments WHERE id = ?', [role.department_id]);
 
-      res.json({
-        data: {
-          ...role,
-          departmentId: role.department_id,
-          level: role.level || null,
-          dailyWage: role.daily_wage ? parseFloat(role.daily_wage.toString()) : null,
-          isActive: role.is_active,
-          department,
-        },
-      });
+      res.json({ data: formatRole(role, department) });
     } catch (error: any) {
       if (error.code === 'ER_DUP_ENTRY') {
         return res.status(400).json({ error: 'Role with this name already exists in this department' });
@@ -250,14 +200,12 @@ export const deleteRole = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
 
-    // Check if role exists
     const existing = await queryOne<{ id: string }>('SELECT id FROM roles WHERE id = ?', [id]);
     if (!existing) {
       return res.status(404).json({ error: 'Role not found' });
     }
 
     await execute('DELETE FROM roles WHERE id = ?', [id]);
-
     res.json({ message: 'Role deleted successfully' });
   } catch (error) {
     console.error('Delete role error:', error);

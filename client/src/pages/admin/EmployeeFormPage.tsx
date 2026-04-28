@@ -11,7 +11,8 @@ import { FormErrors, isIsoDate } from '@/lib/formValidation';
 import { useToast } from '@/hooks/use-toast';
 import { Camera, ImagePlus, UserRound, X } from 'lucide-react';
 
-type EmployeeFormField = 'fullName' | 'departmentId' | 'hireDate' | 'photo' | 'form';
+type SalaryType = 'FIXED' | 'DAILY_WAGE';
+type EmployeeFormField = 'fullName' | 'departmentId' | 'hireDate' | 'baseSalary' | 'photo' | 'form';
 
 export function EmployeeFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +25,8 @@ export function EmployeeFormPage() {
   const [departmentId, setDepartmentId] = useState('');
   const [roleId, setRoleId] = useState('');
   const [hireDate, setHireDate] = useState(new Date().toISOString().slice(0, 10));
+  const [salaryType, setSalaryType] = useState<SalaryType>('DAILY_WAGE');
+  const [baseSalary, setBaseSalary] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState('');
   const [errors, setErrors] = useState<FormErrors<EmployeeFormField>>({});
@@ -34,13 +37,20 @@ export function EmployeeFormPage() {
     queryKey: ['departments-for-employee-form'],
     queryFn: async () => (await departmentsAPI.getAll()).data,
   });
+
+  // Filter roles by department AND salary type (returns exact-type + ANY roles)
   const { data: rolesData } = useQuery({
-    queryKey: ['roles-for-employee-form', departmentId],
+    queryKey: ['roles-for-employee-form', departmentId, salaryType],
     queryFn: async () => {
-      const response = departmentId ? await rolesAPI.getByDepartment(departmentId) : await rolesAPI.getAll();
+      if (!departmentId) {
+        const response = await rolesAPI.getAll({ salaryType });
+        return response.data;
+      }
+      const response = await rolesAPI.getAll({ departmentId, salaryType });
       return response.data;
     },
   });
+
   const { data: employeeData } = useQuery({
     queryKey: ['employee-edit', id],
     enabled: isEdit,
@@ -48,23 +58,25 @@ export function EmployeeFormPage() {
   });
 
   useEffect(() => {
-    if (!employeeData) {
-      return;
-    }
+    if (!employeeData) return;
     setEmployeeId(employeeData.employeeId || '');
     setFullName(employeeData.fullName || '');
     setPhone(employeeData.phone || '');
     setDepartmentId(employeeData.departmentId || '');
     setRoleId(employeeData.roleId || '');
     setHireDate(employeeData.hireDate ? String(employeeData.hireDate).slice(0, 10) : new Date().toISOString().slice(0, 10));
+    setSalaryType((employeeData.salaryType as SalaryType) || 'DAILY_WAGE');
+    setBaseSalary(employeeData.baseSalary != null ? String(employeeData.baseSalary) : '');
     setPhotoPreview(employeeData.photoUrl ? getApiResourceUrl(employeeData.photoUrl) : '');
   }, [employeeData]);
 
+  // Clear role selection when salary type changes (the role list changes)
   useEffect(() => {
-    if (!photo) {
-      return;
-    }
+    setRoleId('');
+  }, [salaryType]);
 
+  useEffect(() => {
+    if (!photo) return;
     const objectUrl = URL.createObjectURL(photo);
     setPhotoPreview(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
@@ -72,9 +84,7 @@ export function EmployeeFormPage() {
 
   const handlePhotoChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
-    if (!file) {
-      return;
-    }
+    if (!file) return;
     if (!file.type.startsWith('image/')) {
       setErrors((current) => ({ ...current, photo: 'Select an image file.' }));
       return;
@@ -89,11 +99,12 @@ export function EmployeeFormPage() {
     if (!fullName.trim()) nextErrors.fullName = 'Full name is required.';
     if (!departmentId) nextErrors.departmentId = 'Select a department.';
     if (!isIsoDate(hireDate)) nextErrors.hireDate = 'Select a valid hire date.';
+    if (salaryType === 'FIXED' && !baseSalary) {
+      nextErrors.baseSalary = 'Monthly salary is required for fixed-salary employees.';
+    }
 
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length) {
-      return;
-    }
+    if (Object.keys(nextErrors).length) return;
 
     const payload = new FormData();
     payload.append('fullName', fullName.trim());
@@ -101,9 +112,9 @@ export function EmployeeFormPage() {
     payload.append('departmentId', departmentId);
     payload.append('roleId', roleId || '');
     payload.append('hireDate', hireDate);
-    if (photo) {
-      payload.append('photo', photo);
-    }
+    payload.append('salaryType', salaryType);
+    if (baseSalary) payload.append('baseSalary', baseSalary);
+    if (photo) payload.append('photo', photo);
 
     setSaving(true);
     try {
@@ -123,6 +134,8 @@ export function EmployeeFormPage() {
     }
   };
 
+  const isFixed = salaryType === 'FIXED';
+
   return (
     <MainLayout title={isEdit ? 'Edit Employee' : 'Add Employee'} description="Manage employee profile details">
       <Card>
@@ -130,47 +143,98 @@ export function EmployeeFormPage() {
           <CardTitle>{isEdit ? 'Update Employee' : 'Create Employee'}</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
+          <form className="grid gap-6 md:grid-cols-2" onSubmit={submit}>
             {errors.form && (
               <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 md:col-span-2" role="alert">
                 {errors.form}
               </p>
             )}
+
+            {/* ── Employee type selection ── */}
+            <div className="md:col-span-2">
+              <Label className="mb-2 block">Employee Type</Label>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setSalaryType('DAILY_WAGE')}
+                  className={`flex flex-col items-start rounded-lg border-2 px-4 py-3 text-left transition-colors ${
+                    !isFixed
+                      ? 'border-amber-500 bg-amber-50 dark:bg-amber-900/20'
+                      : 'border-border hover:border-muted-foreground/40'
+                  }`}
+                >
+                  <span className={`text-sm font-semibold ${!isFixed ? 'text-amber-700 dark:text-amber-400' : ''}`}>
+                    Site Worker
+                  </span>
+                  <span className="mt-0.5 text-xs text-muted-foreground">Paid per present day</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSalaryType('FIXED')}
+                  className={`flex flex-col items-start rounded-lg border-2 px-4 py-3 text-left transition-colors ${
+                    isFixed
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-border hover:border-muted-foreground/40'
+                  }`}
+                >
+                  <span className={`text-sm font-semibold ${isFixed ? 'text-blue-700 dark:text-blue-400' : ''}`}>
+                    Office Employee
+                  </span>
+                  <span className="mt-0.5 text-xs text-muted-foreground">Fixed monthly salary</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ── Basic info ── */}
             {isEdit && (
               <div>
                 <Label htmlFor="employeeId">Employee ID</Label>
                 <Input id="employeeId" value={employeeId} readOnly className="mt-1 bg-muted font-mono" />
               </div>
             )}
+
             <div className={isEdit ? '' : 'md:col-span-2'}>
               <Label htmlFor="fullName">Full Name</Label>
               <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1" required />
               {errors.fullName && <p className="mt-1 text-xs text-red-600">{errors.fullName}</p>}
             </div>
+
             <div>
               <Label htmlFor="phone">Phone</Label>
               <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-1" />
             </div>
+
+            <div>
+              <Label htmlFor="hireDate">Hire Date</Label>
+              <Input id="hireDate" type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} className="mt-1" required />
+              {errors.hireDate && <p className="mt-1 text-xs text-red-600">{errors.hireDate}</p>}
+            </div>
+
+            {/* ── Department + Role ── */}
             <div>
               <Label htmlFor="departmentId">Department</Label>
               <select
                 id="departmentId"
                 className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
                 value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
+                onChange={(e) => { setDepartmentId(e.target.value); setRoleId(''); }}
                 required
               >
-                <option value="">Department</option>
+                <option value="">Select department</option>
                 {(departmentsData || []).map((d: any) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
+                  <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
               {errors.departmentId && <p className="mt-1 text-xs text-red-600">{errors.departmentId}</p>}
             </div>
+
             <div>
-              <Label htmlFor="roleId">Role</Label>
+              <Label htmlFor="roleId">
+                Role
+                {!isFixed && (
+                  <span className="ml-1 text-xs text-muted-foreground">(sets daily wage floor)</span>
+                )}
+              </Label>
               <select
                 id="roleId"
                 className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
@@ -181,15 +245,54 @@ export function EmployeeFormPage() {
                 {(rolesData || []).map((r: any) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
+                    {r.dailyWage && !isFixed ? ` — ${r.dailyWage}/day` : ''}
                   </option>
                 ))}
               </select>
             </div>
+
+            {/* ── Salary field — branches by type ── */}
             <div>
-              <Label htmlFor="hireDate">Hire Date</Label>
-              <Input id="hireDate" type="date" value={hireDate} onChange={(e) => setHireDate(e.target.value)} className="mt-1" required />
-              {errors.hireDate && <p className="mt-1 text-xs text-red-600">{errors.hireDate}</p>}
+              {isFixed ? (
+                <>
+                  <Label htmlFor="baseSalary">Monthly Salary (LKR)</Label>
+                  <Input
+                    id="baseSalary"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="e.g. 85000"
+                    value={baseSalary}
+                    onChange={(e) => setBaseSalary(e.target.value)}
+                    className="mt-1"
+                    required
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Up to 4 absences/month are paid. Excess absences deduct (salary ÷ 30) per day.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <Label htmlFor="baseSalary">Personal Daily Rate (LKR) — optional</Label>
+                  <Input
+                    id="baseSalary"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    placeholder="Leave blank to use role rate"
+                    value={baseSalary}
+                    onChange={(e) => setBaseSalary(e.target.value)}
+                    className="mt-1"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Effective rate = MAX(this rate, role's daily wage). Leave blank to rely solely on the role rate.
+                  </p>
+                </>
+              )}
+              {errors.baseSalary && <p className="mt-1 text-xs text-red-600">{errors.baseSalary}</p>}
             </div>
+
+            {/* ── Photo ── */}
             <div className="md:col-span-2">
               <Label>Employee Photo</Label>
               <div className="mt-2 flex flex-col gap-3 rounded-md border border-border p-3 sm:flex-row sm:items-center">
@@ -228,6 +331,7 @@ export function EmployeeFormPage() {
               </div>
               {errors.photo && <p className="mt-1 text-xs text-red-600">{errors.photo}</p>}
             </div>
+
             <Button type="submit" disabled={saving} className="md:col-span-2 justify-self-start">
               {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Create Employee'}
             </Button>

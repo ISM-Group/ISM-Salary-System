@@ -52,7 +52,7 @@ export function LoginPage() {
       >
         <div className="mb-8 text-center sm:mb-10">
           <div className="mb-4 inline-flex h-24 w-32 items-center justify-center">
-            <img src="/assets/ism-logo.jpg" alt="ISM Group of Company" className="h-full w-full object-contain" />
+            <img src="/assets/ism-logo.png" alt="ISM Group of Company" className="h-full w-full object-contain" />
           </div>
           <p className="mt-4 text-sm text-muted-foreground">Sign in to manage payroll, attendance, and reports.</p>
         </div>
