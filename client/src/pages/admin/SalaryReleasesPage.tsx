@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { TableLoadingRows } from '@/components/ui/loading-spinner';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Plus, Eye, Trash2, CheckCircle, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
@@ -298,7 +299,7 @@ export function SalaryReleasesPage() {
               </TableHeader>
               <TableBody>
                 {isLoading && (
-                  <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-400">Loading...</TableCell></TableRow>
+                  <TableLoadingRows rows={5} columns={9} />
                 )}
                 {!isLoading && releases.length === 0 && (
                   <TableRow><TableCell colSpan={9} className="text-center py-8 text-gray-400">No releases found</TableCell></TableRow>
@@ -392,7 +393,7 @@ export function SalaryReleasesPage() {
                 <div><span className="text-gray-500">Loan Deductions</span><div className="font-mono text-red-600">-{formatCurrency(detail.loan_deductions)}</div></div>
                 <div><span className="text-gray-500">Bonus</span><div className="font-mono text-green-600">+{formatCurrency(detail.bonus)}</div></div>
                 <div><span className="text-gray-500">Calculated Net</span><div className="font-mono font-semibold">{formatCurrency(detail.calculated_net)}</div></div>
-                <div><span className="text-gray-500">Released Amount</span><div className="font-mono font-bold text-indigo-700">{formatCurrency(detail.released_amount)}</div></div>
+                <div><span className="text-gray-500">Released Amount</span><div className="font-mono font-bold text-accent">{formatCurrency(detail.released_amount)}</div></div>
               </div>
               {detail.notes && <div><span className="text-gray-500">Notes:</span> {detail.notes}</div>}
 
@@ -445,7 +446,7 @@ export function SalaryReleasesPage() {
             {/* Step indicators */}
             <div className="flex gap-1 px-6 py-3 bg-gray-50 border-b text-xs font-medium">
               {(['select', 'preview', 'confirm'] as WizardStep[]).map((step, i) => (
-                <span key={step} className={`px-3 py-1 rounded-full ${wizardStep === step ? 'bg-indigo-600 text-white' : 'text-gray-400'}`}>
+                <span key={step} className={`rounded-full px-3 py-1 ${wizardStep === step ? 'bg-accent text-accent-foreground' : 'text-gray-400'}`}>
                   {i + 1}. {step.charAt(0).toUpperCase() + step.slice(1)}
                 </span>
               ))}
@@ -523,7 +524,7 @@ export function SalaryReleasesPage() {
                             <Badge variant="outline" className="ml-2 text-xs">{p.salaryType}</Badge>
                             <Badge variant="outline" className="ml-1 text-xs">{p.releaseType}</Badge>
                           </div>
-                          <div className="font-mono font-bold text-indigo-700">{formatCurrency(p.calculatedNet)}</div>
+                          <div className="font-mono font-bold text-accent">{formatCurrency(p.calculatedNet)}</div>
                         </div>
                         {p.error && <p className="text-sm text-red-600">{p.error}</p>}
                         {!p.error && (
@@ -556,7 +557,7 @@ export function SalaryReleasesPage() {
                         )}
                         {p.salaryType === 'DAILY_WAGE' && p.dayBreakdown && p.dayBreakdown.length > 0 && (
                           <button
-                            className="text-xs text-indigo-600 flex items-center gap-1"
+                            className="flex items-center gap-1 text-xs text-info"
                             onClick={() => setExpandedDays(isExpanded ? null : p.employeeId)}
                           >
                             {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}

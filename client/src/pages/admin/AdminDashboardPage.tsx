@@ -15,6 +15,7 @@ import { StatCard } from '@/components/dashboard/StatCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { PageLoading } from '@/components/ui/loading-spinner';
 import { dashboardAPI } from '@/lib/api';
 import { cn, formatCurrency } from '@/lib/utils';
 
@@ -75,7 +76,7 @@ type InsightRow = {
   status: 'Good' | 'Watch' | 'Review';
 };
 
-const chartColors = ['#4f46e5', '#0891b2', '#d97706', '#059669', '#be123c', '#7c3aed'];
+const chartColors = ['#F29F67', '#34B1AA', '#3B8FF3', '#E0B50F', '#EF4444', '#1E1E2C'];
 
 const compactCurrency = new Intl.NumberFormat('en-LK', {
   style: 'currency',
@@ -387,6 +388,14 @@ export function AdminDashboardPage() {
   const monthlySalaryTotal = Number(stats?.monthlySalary?.total || 0);
   const exposureRate = monthlySalaryTotal ? Math.round((activeLoanAmount / monthlySalaryTotal) * 100) : 0;
 
+  if (isStatsLoading) {
+    return (
+      <MainLayout title="Dashboard" description="System analytics at a glance">
+        <PageLoading text="Loading dashboard..." />
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout title="Dashboard" description="System analytics at a glance">
       <div className="space-y-6">
@@ -547,7 +556,7 @@ export function AdminDashboardPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/15 text-accent">
                 <Activity className="h-5 w-5" />
               </div>
               <div>

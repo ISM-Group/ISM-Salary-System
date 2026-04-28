@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { AlertCircle } from 'lucide-react';
 
 interface LoadingSpinnerProps {
   /** Optional size variant */
@@ -23,14 +24,10 @@ export function LoadingSpinner({ size = 'md', className, text }: LoadingSpinnerP
 
   return (
     <div className={cn('flex flex-col items-center justify-center gap-3', className)}>
-      <div
-        className={cn(
-          'animate-spin rounded-full border-primary/30 border-t-primary',
-          sizeClasses[size]
-        )}
-        role="status"
-        aria-label="Loading"
-      />
+      <div className="relative" role="status" aria-label="Loading">
+        <div className={cn('animate-spin rounded-full border-accent/25 border-t-accent', sizeClasses[size])} />
+        <div className="absolute inset-1 rounded-full border border-primary/10" />
+      </div>
       {text && <p className="text-sm text-muted-foreground">{text}</p>}
     </div>
   );
@@ -43,8 +40,45 @@ export function LoadingSpinner({ size = 'md', className, text }: LoadingSpinnerP
 // PUBLIC_INTERFACE
 export function PageLoading({ text = 'Loading...' }: { text?: string }) {
   return (
-    <div className="flex min-h-[400px] items-center justify-center">
-      <LoadingSpinner size="lg" text={text} />
+    <div className="content-enter flex min-h-[400px] items-center justify-center">
+      <div className="glass-panel flex w-full max-w-sm flex-col items-center gap-5 p-8 text-center">
+        <div className="grid w-full gap-3">
+          <div className="skeleton mx-auto h-3 w-28" />
+          <div className="skeleton h-16 w-full" />
+          <div className="grid grid-cols-3 gap-2">
+            <div className="skeleton h-10" />
+            <div className="skeleton h-10" />
+            <div className="skeleton h-10" />
+          </div>
+        </div>
+        <LoadingSpinner size="lg" text={text} />
+      </div>
+    </div>
+  );
+}
+
+export function TableLoadingRows({ rows = 5, columns = 5 }: { rows?: number; columns?: number }) {
+  return (
+    <>
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <tr key={rowIndex} className="border-b">
+          {Array.from({ length: columns }).map((__, columnIndex) => (
+            <td key={columnIndex} className="p-4">
+              <div className={cn('skeleton h-4', columnIndex === 0 ? 'w-28' : 'w-full')} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
+export function SectionLoading({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="content-enter grid gap-3">
+      {Array.from({ length: rows }).map((_, index) => (
+        <div key={index} className="skeleton h-14 w-full" />
+      ))}
     </div>
   );
 }
@@ -64,20 +98,7 @@ export function PageError({
   return (
     <div className="flex min-h-[300px] flex-col items-center justify-center gap-4 text-center">
       <div className="rounded-full bg-destructive/10 p-3">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className="h-6 w-6 text-destructive"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
+        <AlertCircle className="h-6 w-6 text-destructive" />
       </div>
       <p className="text-sm text-muted-foreground">{message}</p>
       {onRetry && (

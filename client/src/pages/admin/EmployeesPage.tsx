@@ -14,9 +14,10 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Pagination } from '@/components/ui/pagination';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Eye, Pencil, Loader2, Trash2, UserRound } from 'lucide-react';
+import { Plus, Search, Eye, Pencil, Trash2, UserRound } from 'lucide-react';
 import { employeesAPI, departmentsAPI, getApiErrorMessage, getApiResourceUrl } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { TableLoadingRows } from '@/components/ui/loading-spinner';
 
 // PUBLIC_INTERFACE
 /**
@@ -136,11 +137,7 @@ export function EmployeesPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-32 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-accent" />
-                  </TableCell>
-                </TableRow>
+                <TableLoadingRows rows={6} columns={7} />
               ) : (
                 employees.map((employee: any) => (
                   <TableRow key={employee.id} className="group">

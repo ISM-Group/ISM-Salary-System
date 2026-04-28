@@ -52,7 +52,7 @@ export function Header({ title, description }: HeaderProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-white/30 bg-white/40 shadow-sm shadow-indigo-950/5 backdrop-blur-xl supports-[backdrop-filter]:bg-white/35 dark:border-white/8 dark:bg-slate-950/60 dark:shadow-indigo-950/20">
+      <header className="sticky top-0 z-30 border-b border-border bg-background/92 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/82">
         <div className="mx-auto flex h-16 max-w-[2000px] items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             {isMobile && (
@@ -60,17 +60,17 @@ export function Header({ title, description }: HeaderProps) {
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsMobileMenuOpen(true)}
-                className="cursor-pointer lg:hidden dark:text-slate-300 dark:hover:bg-white/8"
+                className="cursor-pointer lg:hidden"
               >
                 <Menu className="h-5 w-5" />
               </Button>
             )}
             <div className="min-w-0 flex-1">
-              <h1 className="truncate bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-lg font-semibold text-transparent sm:text-xl dark:from-slate-100 dark:to-slate-300">
+              <h1 className="truncate text-lg font-semibold text-foreground sm:text-xl">
                 {title}
               </h1>
               {description && (
-                <p className="mt-0.5 hidden truncate text-xs text-slate-600 sm:block dark:text-slate-400">{description}</p>
+                <p className="mt-0.5 hidden truncate text-xs text-muted-foreground sm:block">{description}</p>
               )}
             </div>
           </div>
@@ -80,24 +80,24 @@ export function Header({ title, description }: HeaderProps) {
               variant="ghost"
               size="icon"
               onClick={toggleTheme}
-              className="cursor-pointer text-slate-600 hover:bg-white/60 dark:text-slate-400 dark:hover:bg-white/8"
+              className="cursor-pointer text-muted-foreground hover:text-foreground"
               aria-label="Toggle theme"
             >
-              {theme === 'dark' ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </Button>
 
-            <Button variant="ghost" size="icon" className="relative hidden cursor-pointer sm:flex text-slate-600 dark:text-slate-400 dark:hover:bg-white/8">
+            <Button variant="ghost" size="icon" className="relative hidden cursor-pointer text-muted-foreground hover:text-foreground sm:flex">
               <Bell className="h-5 w-5" />
-              <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-accent" />
             </Button>
 
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 cursor-default items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-semibold text-white sm:h-9 sm:w-9 sm:text-sm">
+              <div className="flex h-8 w-8 cursor-default items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground sm:h-9 sm:w-9 sm:text-sm dark:bg-accent dark:text-accent-foreground">
                 {user?.full_name?.charAt(0).toUpperCase()}
               </div>
               <div className="hidden sm:block">
-                <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{user?.full_name}</p>
-                <p className="text-xs capitalize text-slate-500 dark:text-slate-400">{user?.role?.toLowerCase()}</p>
+                <p className="text-sm font-medium text-foreground">{user?.full_name}</p>
+                <p className="text-xs capitalize text-muted-foreground">{user?.role?.toLowerCase()}</p>
               </div>
             </div>
           </div>
@@ -113,9 +113,9 @@ export function Header({ title, description }: HeaderProps) {
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="Close menu"
           />
-          <div className="relative h-full w-72 max-w-[85vw] border-r border-white/30 bg-white/80 shadow-2xl shadow-indigo-950/20 backdrop-blur-2xl dark:border-white/8 dark:bg-slate-950/90">
+          <div className="relative h-full w-72 max-w-[85vw] border-r border-sidebar-border bg-sidebar shadow-2xl">
             <div className="flex h-full flex-col">
-              <div className="flex h-20 items-center justify-between border-b border-white/30 px-4 py-2 dark:border-white/8">
+              <div className="flex h-20 items-center justify-between border-b border-sidebar-border px-4 py-2">
                 <div className="flex items-center gap-2.5">
                   <img src="/assets/ism-logo.jpg" alt="ISM Group of Company" className="h-16 w-auto" />
                 </div>
@@ -123,7 +123,7 @@ export function Header({ title, description }: HeaderProps) {
                   variant="ghost"
                   size="icon"
                   onClick={toggleTheme}
-                  className="cursor-pointer text-slate-600 dark:text-slate-400"
+                  className="cursor-pointer text-sidebar-muted hover:text-sidebar-foreground"
                 >
                   {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
                 </Button>
@@ -141,10 +141,10 @@ export function Header({ title, description }: HeaderProps) {
                       to={item.href}
                       onClick={() => setIsMobileMenuOpen(false)}
                       className={cn(
-                        'flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200',
+                        'flex min-h-11 cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors duration-200',
                         isActive
-                          ? 'bg-indigo-500/15 text-indigo-700 ring-1 ring-indigo-500/20 dark:bg-indigo-500/20 dark:text-indigo-400 dark:ring-indigo-500/30'
-                          : 'text-slate-600 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/8 dark:hover:text-slate-100'
+                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                          : 'text-sidebar-muted hover:bg-sidebar-accent/70 hover:text-sidebar-foreground'
                       )}
                     >
                       <item.icon className="h-5 w-5 flex-shrink-0 opacity-80" />
@@ -154,15 +154,15 @@ export function Header({ title, description }: HeaderProps) {
                 })}
               </nav>
 
-              <div className="border-t border-white/30 p-3 dark:border-white/8">
-                <div className="mb-3 rounded-xl bg-white/50 px-3 py-2 dark:bg-white/6">
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{user?.full_name}</p>
-                  <p className="text-xs capitalize text-slate-500 dark:text-slate-400">{user?.role?.toLowerCase()}</p>
+              <div className="border-t border-sidebar-border p-3">
+                <div className="mb-3 rounded-md bg-sidebar-accent/60 px-3 py-2">
+                  <p className="text-sm font-medium text-sidebar-foreground">{user?.full_name}</p>
+                  <p className="text-xs capitalize text-sidebar-muted">{user?.role?.toLowerCase()}</p>
                 </div>
                 <Button
                   variant="ghost"
                   onClick={() => { logout(); setIsMobileMenuOpen(false); }}
-                  className="w-full cursor-pointer justify-start text-slate-600 hover:bg-white/60 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/8 dark:hover:text-slate-100"
+                  className="w-full cursor-pointer justify-start text-sidebar-muted hover:bg-sidebar-accent hover:text-sidebar-foreground"
                 >
                   <LogOut className="h-5 w-5" />
                   <span className="ml-3">Logout</span>

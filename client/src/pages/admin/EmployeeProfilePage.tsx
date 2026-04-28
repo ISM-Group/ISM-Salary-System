@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { PageLoading } from '@/components/ui/loading-spinner';
 import {
-  ArrowLeft, Edit, Loader2, Calendar, DollarSign, TrendingUp, CreditCard,
+  ArrowLeft, Edit, Calendar, DollarSign, TrendingUp, CreditCard,
   Wallet, Plus, CheckCircle, Trash2, ExternalLink, UserRound,
 } from 'lucide-react';
 import { employeesAPI, salaryReleasesAPI, salaryHistoryAPI, loansAPI, advanceSalariesAPI, exportsAPI, getApiErrorMessage, getApiResourceUrl } from '@/lib/api';
@@ -125,9 +126,7 @@ export function EmployeeProfilePage() {
   if (isLoading) {
     return (
       <MainLayout title="Employee Profile" description="Loading...">
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-        </div>
+        <PageLoading text="Loading employee profile..." />
       </MainLayout>
     );
   }
@@ -186,7 +185,7 @@ export function EmployeeProfilePage() {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant={employee.isActive ? 'default' : 'secondary'}>{employee.isActive ? 'Active' : 'Inactive'}</Badge>
-            <Badge variant="outline" className={employee.salaryType === 'FIXED' ? 'border-purple-300 text-purple-700' : 'border-blue-300 text-blue-700'}>
+            <Badge variant="outline" className={employee.salaryType === 'FIXED' ? 'border-accent/50 text-accent' : 'border-info/50 text-info'}>
               {employee.salaryType}
             </Badge>
             <Link to={`/admin/employees/${id}/edit`}>
@@ -203,8 +202,8 @@ export function EmployeeProfilePage() {
               onClick={() => setTab(t.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 tab === t.key
-                  ? 'border-indigo-600 text-indigo-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-800'
+                  ? 'border-accent text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               {t.label}
@@ -246,7 +245,7 @@ export function EmployeeProfilePage() {
                   </div>
                 </div>
                 <div className="mt-3 text-right">
-                  <Link to={`/admin/employees/${id}/attendance/calendar`} className="text-xs text-indigo-600 hover:underline flex items-center gap-1 justify-end">
+                  <Link to={`/admin/employees/${id}/attendance/calendar`} className="flex items-center justify-end gap-1 text-xs text-info hover:underline">
                     Full calendar <ExternalLink className="h-3 w-3" />
                   </Link>
                 </div>
@@ -491,7 +490,7 @@ export function EmployeeProfilePage() {
                     </TableCell>
                     <TableCell>
                       {adv.slipPhotoUrl && (
-                        <a href={adv.slipPhotoUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline flex items-center gap-1 text-xs">
+                        <a href={adv.slipPhotoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-info hover:underline">
                           View <ExternalLink className="h-3 w-3" />
                         </a>
                       )}

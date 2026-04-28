@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { TableLoadingRows } from '@/components/ui/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
 import { KeyRound, UserCheck, UserX } from 'lucide-react';
 
@@ -63,26 +64,26 @@ export function UserManagementPage() {
           <CardTitle>System Users</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <p className="text-sm text-gray-500">Loading...</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Full Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(data || []).map((user: any) => (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Username</TableHead>
+                <TableHead>Full Name</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableLoadingRows rows={5} columns={5} />
+              ) : (
+                (data || []).map((user: any) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-mono text-sm">{user.username}</TableCell>
                     <TableCell>{user.fullName}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={user.role === 'ADMIN' ? 'border-purple-300 text-purple-700' : 'border-blue-300 text-blue-700'}>
+                      <Badge variant="outline" className={user.role === 'ADMIN' ? 'border-accent/50 text-accent' : 'border-info/50 text-info'}>
                         {user.role}
                       </Badge>
                     </TableCell>
@@ -113,19 +114,19 @@ export function UserManagementPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
+                ))
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
       {/* Reset Password Modal */}
       {resetTargetId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-sm rounded-lg bg-card p-6 text-card-foreground shadow-xl">
             <h2 className="mb-4 text-lg font-semibold">Reset Password</h2>
-            <p className="mb-3 text-sm text-gray-600">
+            <p className="mb-3 text-sm text-muted-foreground">
               Enter a new password for{' '}
               <span className="font-medium">{(data || []).find((u: any) => u.id === resetTargetId)?.fullName}</span>
             </p>

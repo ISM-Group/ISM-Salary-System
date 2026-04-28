@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { LogIn, Moon, Sun } from 'lucide-react';
+import { Loader2, LogIn, Moon, Sun } from 'lucide-react';
 import { getApiErrorMessage } from '@/lib/api';
 
 export function LoginPage() {
@@ -44,12 +44,6 @@ export function LoginPage() {
 
   return (
     <div className="app-mesh relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-4 sm:p-6">
-      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden>
-        <div className="absolute -right-20 -top-32 h-96 w-96 rounded-full bg-indigo-400/35 blur-3xl dark:bg-indigo-600/12" />
-        <div className="absolute -left-24 top-1/4 h-80 w-80 rounded-full bg-violet-400/30 blur-3xl dark:bg-violet-600/10" />
-        <div className="absolute bottom-0 right-1/3 h-72 w-72 rounded-full bg-emerald-300/20 blur-3xl dark:bg-emerald-600/8" />
-      </div>
-
       <motion.div
         className="relative z-10 w-full max-w-[420px]"
         initial={reduceMotion ? false : { opacity: 0, y: 20 }}
@@ -60,15 +54,15 @@ export function LoginPage() {
           <div className="mb-4 inline-flex h-24 w-32 items-center justify-center">
             <img src="/assets/ism-logo.jpg" alt="ISM Group of Company" className="h-full w-full object-contain" />
           </div>
-          <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">Sign in to manage payroll, attendance, and reports.</p>
+          <p className="mt-4 text-sm text-muted-foreground">Sign in to manage payroll, attendance, and reports.</p>
         </div>
 
         <div className="glass-panel p-6 sm:p-8">
-          <h2 className="mb-1 text-center text-lg font-semibold text-slate-900 dark:text-slate-100">Welcome back</h2>
-          <p className="mb-6 text-center text-sm text-slate-600 dark:text-slate-400">Enter your organization credentials</p>
+          <h2 className="mb-1 text-center text-lg font-semibold text-foreground">Welcome back</h2>
+          <p className="mb-6 text-center text-sm text-muted-foreground">Enter your organization credentials</p>
           <form className="space-y-4" onSubmit={onSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-slate-700 dark:text-slate-300">
+              <Label htmlFor="username">
                 Username
               </Label>
               <Input
@@ -77,12 +71,12 @@ export function LoginPage() {
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="h-11 border-white/50 bg-white/50 text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-slate-100"
+                className="h-11"
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-slate-700 dark:text-slate-300">
+              <Label htmlFor="password">
                 Password
               </Label>
               <Input
@@ -92,7 +86,7 @@ export function LoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-11 border-white/50 bg-white/50 text-slate-900 dark:border-white/10 dark:bg-white/6 dark:text-slate-100"
+                className="h-11"
                 required
               />
             </div>
@@ -108,7 +102,10 @@ export function LoginPage() {
               disabled={loading}
             >
               {loading ? (
-                'Signing in…'
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in...
+                </span>
               ) : (
                 <span className="inline-flex items-center gap-2">
                   <LogIn className="h-4 w-4" />
@@ -119,13 +116,13 @@ export function LoginPage() {
           </form>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-500">Secure access to ISM salary operations</p>
+        <p className="mt-6 text-center text-xs text-muted-foreground">Secure access to ISM salary operations</p>
         <div className="mt-4 flex justify-center">
           <Button
             variant="ghost"
             size="sm"
             onClick={toggleTheme}
-            className="gap-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            className="gap-2 text-muted-foreground hover:text-foreground"
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             {theme === 'dark' ? 'Light mode' : 'Dark mode'}
