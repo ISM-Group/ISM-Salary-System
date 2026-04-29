@@ -29,7 +29,9 @@ export const getAttendance = async (req: AuthRequest, res: Response): Promise<vo
 
 export const getDailyAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const date = (req.query.date as string | undefined) || new Date().toISOString().slice(0, 10);
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const date = (req.query.date as string | undefined) || today;
     const rows = await query(
       `SELECT a.id, a.employee_id as employeeId, a.status, a.notes,
               a.role_id as roleId, r.name as roleName,

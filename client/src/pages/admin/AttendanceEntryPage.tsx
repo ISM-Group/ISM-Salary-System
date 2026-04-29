@@ -12,8 +12,12 @@ import { Search, CalendarDays, Users, CheckCircle2, XCircle, Save, Loader2 } fro
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT';
 
+function localDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function AttendanceEntryPage() {
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(() => localDateStr(new Date()));
   const [departmentId, setDepartmentId] = useState('');
   const [search, setSearch] = useState('');
   const [bulkRole, setBulkRole] = useState('');

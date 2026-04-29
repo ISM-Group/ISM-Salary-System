@@ -147,9 +147,17 @@ export function EmployeeProfilePage() {
   // Build calendar data
   const calData = calendarRes?.data;
   const attendanceByDate: Record<string, any> = {};
-  // Normalize date keys — MySQL DATE may arrive as full ISO string or Date object
   (calData?.attendance || []).forEach((a: any) => {
-    const key = String(a.date).slice(0, 10);
+    // Handle both "YYYY-MM-DD" (dateStrings:true) and "YYYY-MM-DDTHH:mm:ss.sssZ" (Date object serialized)
+    // For ISO strings, parse to Date and extract LOCAL date parts so server timezone offset is undone
+    const s = String(a.date);
+    let key: string;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      key = s;
+    } else {
+      const d = new Date(s);
+      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
     attendanceByDate[key] = a;
   });
   const calDays = calendarMonthDays(calYear, calMonth);
@@ -352,6 +360,14 @@ export function EmployeeProfilePage() {
                 No record
               </span>
             </div>
+            {/* No-records hint */}
+            {(calData?.attendance || []).length === 0 && (
+              <p className="text-sm text-gray-400 text-center py-2">
+                No attendance records for {monthLabel}.{' '}
+                <Link to="/admin/attendance" className="text-info hover:underline">Go to Attendance Entry</Link>{' '}
+                to save records.
+              </p>
+            )}
             {/* Release bars */}
             {(calData?.releases || []).length > 0 && (
               <Card>
