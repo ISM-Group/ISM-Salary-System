@@ -82,6 +82,15 @@ interface DailyWagePreviewResult {
   ruleGrossAddition: number;
 }
 
+interface FixedDayEntry {
+  date: string;
+  status: 'PRESENT' | 'ABSENT';
+  roleName: string | null;
+  dailyRate: number;
+  amount: number;
+  paidOff: boolean;
+}
+
 async function buildDailyWagePreview(
   employeeId: string,
   from: string,
@@ -161,12 +170,14 @@ async function buildDailyWagePreview(
 
 interface FixedPreview {
   baseSalary: number;
+  dailyRate: number;
   absentDays: number;
   paidOffs: number;
   excessAbsent: number;
   absentDeduction: number;
   grossAmount: number;
   workingDays: number;
+  dayBreakdown: FixedDayEntry[];
 }
 
 async function buildFixedPreview(
@@ -175,32 +186,40 @@ async function buildFixedPreview(
   to: string,
   baseSalary: number
 ): Promise<FixedPreview> {
-  const absentRow = await queryOne<{ cnt: number }>(
-    `SELECT COUNT(*) as cnt FROM attendance
-     WHERE employee_id = ? AND date BETWEEN ? AND ? AND status = 'ABSENT'`,
-    [employeeId, from, to]
-  );
-  const presentRow = await queryOne<{ cnt: number }>(
-    `SELECT COUNT(*) as cnt FROM attendance
-     WHERE employee_id = ? AND date BETWEEN ? AND ? AND status = 'PRESENT'`,
+  const rows = await query<any>(
+    `SELECT a.date, a.status, r.name as roleName
+     FROM attendance a
+     LEFT JOIN roles r ON r.id = a.role_id
+     WHERE a.employee_id = ? AND a.date BETWEEN ? AND ?
+     ORDER BY a.date ASC`,
     [employeeId, from, to]
   );
 
-  const absentDays = absentRow?.cnt ?? 0;
-  const workingDays = presentRow?.cnt ?? 0;
+  const dailyRate = Math.round((baseSalary / 30) * 100) / 100;
+  let absentDays = 0;
+  let workingDays = 0;
+
+  for (const r of rows) {
+    if (r.status === 'PRESENT') workingDays++;
+    else absentDays++;
+  }
+
   const paidOffs = Math.min(4, absentDays);
   const excessAbsent = Math.max(0, absentDays - 4);
-  const absentDeduction = Math.round((excessAbsent * (baseSalary / 30)) * 100) / 100;
+  const absentDeduction = Math.round(excessAbsent * dailyRate * 100) / 100;
 
-  return {
-    baseSalary,
-    absentDays,
-    paidOffs,
-    excessAbsent,
-    absentDeduction,
-    grossAmount: baseSalary,
-    workingDays,
-  };
+  let paidOffsApplied = 0;
+  const dayBreakdown: FixedDayEntry[] = rows.map((r: any) => {
+    if (r.status === 'PRESENT') {
+      return { date: r.date, status: 'PRESENT' as const, roleName: r.roleName, dailyRate, amount: dailyRate, paidOff: false };
+    } else {
+      const isPaidOff = paidOffsApplied < paidOffs;
+      if (isPaidOff) paidOffsApplied++;
+      return { date: r.date, status: 'ABSENT' as const, roleName: r.roleName, dailyRate, amount: isPaidOff ? dailyRate : 0, paidOff: isPaidOff };
+    }
+  });
+
+  return { baseSalary, dailyRate, absentDays, paidOffs, excessAbsent, absentDeduction, grossAmount: baseSalary, workingDays, dayBreakdown };
 }
 
 async function calculateAdvanceDeductions(employeeId: string, from: string, to: string): Promise<number> {
@@ -376,10 +395,15 @@ export const batchPreview = async (req: AuthRequest, res: Response): Promise<voi
           let grossAmount = 0;
           let workingDays = 0;
           let absentDeduction = 0;
+          let dayBreakdown: DayEntry[] | FixedDayEntry[] = [];
           let paidLeaveDaysApplied = 0;
           let fullAttendanceBonusApplied = false;
           let ruleGrossAddition = 0;
           let averageDailyRate = 0;
+          let dailyRate = 0;
+          let absentDays = 0;
+          let paidOffs = 0;
+          let excessAbsent = 0;
 
           if (salaryType === 'DAILY_WAGE') {
             const rules = await getDepartmentRulesForEmployee(empId);
@@ -390,11 +414,17 @@ export const batchPreview = async (req: AuthRequest, res: Response): Promise<voi
             paidLeaveDaysApplied = preview.paidLeaveDaysApplied;
             fullAttendanceBonusApplied = preview.fullAttendanceBonusApplied;
             ruleGrossAddition = preview.ruleGrossAddition;
+            dayBreakdown = preview.dayBreakdown;
           } else {
             const fixed = await buildFixedPreview(empId, periodStart, periodEnd, baseSalary);
             grossAmount = fixed.grossAmount;
             workingDays = fixed.workingDays;
             absentDeduction = fixed.absentDeduction;
+            dayBreakdown = fixed.dayBreakdown;
+            dailyRate = fixed.dailyRate;
+            absentDays = fixed.absentDays;
+            paidOffs = fixed.paidOffs;
+            excessAbsent = fixed.excessAbsent;
           }
 
           const advanceDeductions = await calculateAdvanceDeductions(empId, periodStart, periodEnd);
@@ -405,8 +435,10 @@ export const batchPreview = async (req: AuthRequest, res: Response): Promise<voi
           return {
             employeeId: empId, salaryType, releaseType, workingDays, grossAmount,
             absentDeduction, advanceDeductions, loanDeductions: loans.total, bonus: bonusNum,
-            calculatedNet, releasedAmount: calculatedNet,
-            ...(salaryType === 'DAILY_WAGE' ? { averageDailyRate, paidLeaveDaysApplied, fullAttendanceBonusApplied, ruleGrossAddition } : {}),
+            calculatedNet, releasedAmount: calculatedNet, dayBreakdown,
+            ...(salaryType === 'DAILY_WAGE'
+              ? { averageDailyRate, paidLeaveDaysApplied, fullAttendanceBonusApplied, ruleGrossAddition }
+              : { dailyRate, absentDays, paidOffs, excessAbsent }),
           };
         } catch (e: any) {
           return { employeeId: empId, error: e.message };

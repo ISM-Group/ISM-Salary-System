@@ -11,8 +11,9 @@ import { PageLoading } from '@/components/ui/loading-spinner';
 import {
   ArrowLeft, Edit, Calendar, DollarSign, TrendingUp, CreditCard,
   Wallet, Plus, CheckCircle, Trash2, ExternalLink, UserRound,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
-import { employeesAPI, salaryReleasesAPI, salaryHistoryAPI, loansAPI, advanceSalariesAPI, exportsAPI, getApiErrorMessage, getApiResourceUrl } from '@/lib/api';
+import { attendanceAPI, employeesAPI, salaryReleasesAPI, salaryHistoryAPI, loansAPI, advanceSalariesAPI, exportsAPI, getApiErrorMessage, getApiResourceUrl } from '@/lib/api';
 import { formatCurrency } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -38,6 +39,18 @@ function calendarMonthDays(year: number, month: number): (string | null)[] {
   return cells;
 }
 
+function normalizeAttendanceDate(value: unknown): string | null {
+  if (!value) return null;
+
+  const raw = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}-${String(parsed.getDate()).padStart(2, '0')}`;
+}
+
 export function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -49,6 +62,9 @@ export function EmployeeProfilePage() {
   const now = new Date();
   const [calYear, setCalYear] = useState(now.getFullYear());
   const [calMonth, setCalMonth] = useState(now.getMonth() + 1);
+  const monthParam = `${calYear}-${String(calMonth).padStart(2, '0')}`;
+  const monthFrom = `${monthParam}-01`;
+  const monthTo = `${monthParam}-${String(new Date(calYear, calMonth, 0).getDate()).padStart(2, '0')}`;
 
   // Increment modal
   const [showIncrementModal, setShowIncrementModal] = useState(false);
@@ -82,8 +98,13 @@ export function EmployeeProfilePage() {
 
   const { data: calendarRes } = useQuery({
     queryKey: ['employee-calendar', id, calYear, calMonth],
-    queryFn: () =>
-      salaryReleasesAPI.getEmployeeCalendar(id!, `${calYear}-${String(calMonth).padStart(2, '0')}`),
+    queryFn: () => salaryReleasesAPI.getEmployeeCalendar(id!, monthParam),
+    enabled: tab === 'calendar',
+  });
+
+  const { data: attendanceCalendarRes, isLoading: isAttendanceCalendarLoading } = useQuery({
+    queryKey: ['employee-attendance-calendar-month', id, monthFrom, monthTo],
+    queryFn: () => attendanceAPI.getEmployeeAttendanceCalendar(id!, { from: monthFrom, to: monthTo }),
     enabled: tab === 'calendar',
   });
 
@@ -146,18 +167,11 @@ export function EmployeeProfilePage() {
 
   // Build calendar data
   const calData = calendarRes?.data;
+  const attendanceRows: any[] = attendanceCalendarRes?.data || calData?.attendance || [];
   const attendanceByDate: Record<string, any> = {};
-  (calData?.attendance || []).forEach((a: any) => {
-    // Handle both "YYYY-MM-DD" (dateStrings:true) and "YYYY-MM-DDTHH:mm:ss.sssZ" (Date object serialized)
-    // For ISO strings, parse to Date and extract LOCAL date parts so server timezone offset is undone
-    const s = String(a.date);
-    let key: string;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-      key = s;
-    } else {
-      const d = new Date(s);
-      key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    }
+  attendanceRows.forEach((a: any) => {
+    const key = normalizeAttendanceDate(a.date);
+    if (!key) return;
     attendanceByDate[key] = a;
   });
   const calDays = calendarMonthDays(calYear, calMonth);
@@ -294,11 +308,15 @@ export function EmployeeProfilePage() {
         {tab === 'calendar' && (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <Button variant="outline" size="sm" onClick={prevMonth}>←</Button>
-              <span className="font-medium">{monthLabel}</span>
-              <Button variant="outline" size="sm" onClick={nextMonth}>→</Button>
+              <Button variant="outline" size="icon" onClick={prevMonth} aria-label="Previous month">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="min-w-32 font-medium">{monthLabel}</span>
+              <Button variant="outline" size="icon" onClick={nextMonth} aria-label="Next month">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-gray-400 mb-1">
+            <div className="mb-1 grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground">
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
                 <div key={d}>{d}</div>
               ))}
@@ -319,23 +337,27 @@ export function EmployeeProfilePage() {
                     className={[
                       'rounded-lg border p-2 min-h-[64px] flex flex-col items-center justify-start gap-1 text-xs transition-colors',
                       isPresent
-                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-500/45 dark:bg-emerald-500/12 dark:text-emerald-100'
                         : isAbsent
-                          ? 'bg-red-50 border-red-300 text-red-900'
-                          : 'bg-white border-gray-100 text-gray-300',
+                          ? 'border-red-300 bg-red-50 text-red-900 dark:border-red-500/45 dark:bg-red-500/12 dark:text-red-100'
+                          : 'border-border/80 bg-card text-muted-foreground dark:bg-muted/35',
                     ].join(' ')}
                   >
                     <span className={[
                       'font-semibold text-sm leading-none',
-                      isPresent ? 'text-emerald-700' : isAbsent ? 'text-red-600' : 'text-gray-300',
+                      isPresent
+                        ? 'text-emerald-700 dark:text-emerald-300'
+                        : isAbsent
+                          ? 'text-red-600 dark:text-red-300'
+                          : 'text-muted-foreground/70',
                     ].join(' ')}>
                       {day}
                     </span>
                     {isPresent && (
-                      <span className="mt-1 text-[10px] font-medium text-emerald-600 leading-none">Present</span>
+                      <span className="mt-1 text-[10px] font-medium leading-none text-emerald-600 dark:text-emerald-300">Present</span>
                     )}
                     {isAbsent && (
-                      <span className="mt-1 text-[10px] font-medium text-red-500 leading-none">Absent</span>
+                      <span className="mt-1 text-[10px] font-medium leading-none text-red-500 dark:text-red-300">Absent</span>
                     )}
                     {hasRecord && att.roleName && (
                       <span className="text-[9px] truncate max-w-full opacity-60 leading-none">{att.roleName}</span>
@@ -345,26 +367,30 @@ export function EmployeeProfilePage() {
               })}
             </div>
 
+            {isAttendanceCalendarLoading && (
+              <p className="text-center text-sm text-muted-foreground">Loading attendance records...</p>
+            )}
+
             {/* Legend */}
-            <div className="flex items-center gap-4 text-xs text-gray-500">
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded border border-emerald-300 bg-emerald-50" />
+                <span className="inline-block h-3 w-3 rounded border border-emerald-300 bg-emerald-50 dark:border-emerald-500/45 dark:bg-emerald-500/12" />
                 Present
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded border border-red-300 bg-red-50" />
+                <span className="inline-block h-3 w-3 rounded border border-red-300 bg-red-50 dark:border-red-500/45 dark:bg-red-500/12" />
                 Absent
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded border border-gray-100 bg-white" />
+                <span className="inline-block h-3 w-3 rounded border border-border bg-card dark:bg-muted/35" />
                 No record
               </span>
             </div>
             {/* No-records hint */}
-            {(calData?.attendance || []).length === 0 && (
+            {!isAttendanceCalendarLoading && attendanceRows.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-2">
                 No attendance records for {monthLabel}.{' '}
-                <Link to="/admin/attendance" className="text-info hover:underline">Go to Attendance Entry</Link>{' '}
+                <Link to="/admin/attendance/entry" className="text-info hover:underline">Go to Attendance Entry</Link>{' '}
                 to save records.
               </p>
             )}

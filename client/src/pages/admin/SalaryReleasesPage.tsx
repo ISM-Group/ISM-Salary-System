@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { salaryReleasesAPI, employeesAPI, departmentsAPI, getApiErrorMessage } from '@/lib/api';
@@ -453,35 +454,35 @@ export function SalaryReleasesPage() {
       )}
 
       {/* New Release Wizard */}
-      {showWizard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
+      {showWizard && createPortal((
+        <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/60 px-4 py-6 backdrop-blur-sm sm:items-center sm:py-8">
+          <div className="my-auto flex max-h-[calc(100vh-3rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground shadow-2xl sm:max-h-[calc(100vh-4rem)]">
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-border px-6 py-4">
               <h2 className="text-lg font-semibold">New Salary Release</h2>
               <Button variant="ghost" size="sm" onClick={resetWizard}>✕</Button>
             </div>
 
             {/* Step indicators */}
-            <div className="flex gap-1 px-6 py-3 bg-gray-50 border-b text-xs font-medium flex-shrink-0">
+            <div className="flex flex-shrink-0 gap-1 border-b border-border bg-muted/60 px-6 py-3 text-xs font-medium">
               {(['select', 'preview', 'confirm'] as WizardStep[]).map((step, i) => (
-                <span key={step} className={`rounded-full px-3 py-1 ${wizardStep === step ? 'bg-accent text-accent-foreground' : 'text-gray-400'}`}>
+                <span key={step} className={`rounded-full px-3 py-1 ${wizardStep === step ? 'bg-accent text-accent-foreground' : 'text-muted-foreground'}`}>
                   {i + 1}. {step.charAt(0).toUpperCase() + step.slice(1)}
                 </span>
               ))}
             </div>
 
-            <div className="p-6 overflow-y-auto flex-1">
+            <div className="flex-1 overflow-y-auto p-6">
 
               {/* Step 1: Select employees + period */}
               {wizardStep === 'select' && (
                 <div className="space-y-5">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">Period Start</label>
+                      <label className="mb-1 block text-sm font-medium text-foreground">Period Start</label>
                       <Input type="date" value={wizardPeriodStart} onChange={(e) => setWizardPeriodStart(e.target.value)} />
                     </div>
                     <div>
-                      <label className="text-sm font-medium text-gray-700 mb-1 block">Period End</label>
+                      <label className="mb-1 block text-sm font-medium text-foreground">Period End</label>
                       <Input type="date" value={wizardPeriodEnd} onChange={(e) => setWizardPeriodEnd(e.target.value)} />
                     </div>
                   </div>
@@ -491,27 +492,27 @@ export function SalaryReleasesPage() {
                     <Button size="sm" variant="outline" onClick={() => { setWizardPeriodStart(thisMonthStart()); setWizardPeriodEnd(thisMonthEnd()); }}>This Month</Button>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">Bonus (applies to all selected)</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">Bonus (applies to all selected)</label>
                     <Input type="number" min="0" step="0.01" value={wizardBonus} onChange={(e) => setWizardBonus(e.target.value)} className="w-40" />
                   </div>
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700">Select Employees ({wizardEmployeeIds.length} selected)</label>
+                      <label className="text-sm font-medium text-foreground">Select Employees ({wizardEmployeeIds.length} selected)</label>
                       <div className="flex gap-2">
                         <Button size="sm" variant="outline" onClick={selectAll}>All Active</Button>
                         <Button size="sm" variant="outline" onClick={clearAll}>Clear</Button>
                       </div>
                     </div>
-                    <div className="border rounded-lg divide-y max-h-48 overflow-y-auto">
+                    <div className="max-h-48 overflow-y-auto rounded-lg border border-border divide-y divide-border">
                       {employees.map((emp) => (
-                        <label key={emp.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50">
+                        <label key={emp.id} className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted/70">
                           <input
                             type="checkbox"
                             checked={wizardEmployeeIds.includes(emp.id)}
                             onChange={() => toggleEmployee(emp.id)}
                           />
                           <span className="text-sm">{emp.fullName}</span>
-                          <span className="text-xs text-gray-400 ml-auto">{emp.employeeId} · {emp.salaryType}</span>
+                          <span className="ml-auto text-xs text-muted-foreground">{emp.employeeId} · {emp.salaryType}</span>
                         </label>
                       ))}
                     </div>
@@ -528,14 +529,14 @@ export function SalaryReleasesPage() {
               {/* Step 2: Preview */}
               {wizardStep === 'preview' && (
                 <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-muted-foreground">
                     Period: <strong>{wizardPeriodStart}</strong> → <strong>{wizardPeriodEnd}</strong>
                   </p>
                   {previews.map((p) => {
                     const emp = employees.find((e) => e.id === p.employeeId);
                     const isExpanded = expandedDays === p.employeeId;
                     return (
-                      <div key={p.employeeId} className="border rounded-xl p-4 space-y-3">
+                      <div key={p.employeeId} className="space-y-3 rounded-xl border border-border p-4">
                         <div className="flex items-center justify-between">
                           <div>
                             <span className="font-medium">{emp?.fullName || p.employeeId}</span>
@@ -547,34 +548,34 @@ export function SalaryReleasesPage() {
                         {p.error && <p className="text-sm text-red-600">{p.error}</p>}
                         {!p.error && (
                           <div className="grid grid-cols-3 gap-2 text-sm">
-                            <div><span className="text-gray-500">Working Days</span><div className="font-medium">{p.workingDays}</div></div>
-                            <div><span className="text-gray-500">Gross</span><div className="font-mono">{formatCurrency(p.grossAmount)}</div></div>
+                            <div><span className="text-muted-foreground">Working Days</span><div className="font-medium">{p.workingDays}</div></div>
+                            <div><span className="text-muted-foreground">Gross</span><div className="font-mono">{formatCurrency(p.grossAmount)}</div></div>
                             {p.salaryType === 'FIXED' && (
-                              <div><span className="text-gray-500">Absent (paid {p.paidOffs}/excess {p.excessAbsent})</span><div className="font-mono text-red-600">-{formatCurrency(p.absentDeduction || 0)}</div></div>
+                              <div><span className="text-muted-foreground">Absent (paid {p.paidOffs}/excess {p.excessAbsent})</span><div className="font-mono text-red-600 dark:text-red-400">-{formatCurrency(p.absentDeduction || 0)}</div></div>
                             )}
                             {p.salaryType === 'DAILY_WAGE' && p.averageDailyRate !== undefined && (
-                              <div><span className="text-gray-500">Avg Daily Rate</span><div className="font-mono">{formatCurrency(p.averageDailyRate)}</div></div>
+                              <div><span className="text-muted-foreground">Avg Daily Rate</span><div className="font-mono">{formatCurrency(p.averageDailyRate)}</div></div>
                             )}
                             {(p.paidLeaveDaysApplied ?? 0) > 0 && (
-                              <div className="col-span-3 flex items-center gap-2 rounded bg-green-50 border border-green-200 px-3 py-1.5 text-sm text-green-800">
+                              <div className="col-span-3 flex items-center gap-2 rounded border border-green-200 bg-green-50 px-3 py-1.5 text-sm text-green-800 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-200">
                                 <span className="font-medium">+{p.paidLeaveDaysApplied} paid leave day{p.paidLeaveDaysApplied! > 1 ? 's' : ''}</span>
-                                <span className="text-green-600">· +{formatCurrency(p.ruleGrossAddition ?? 0)}</span>
+                                <span className="text-green-600 dark:text-green-300">· +{formatCurrency(p.ruleGrossAddition ?? 0)}</span>
                               </div>
                             )}
                             {p.fullAttendanceBonusApplied && (
-                              <div className="col-span-3 flex items-center gap-2 rounded bg-green-50 border border-green-200 px-3 py-1.5 text-sm text-green-800">
+                              <div className="col-span-3 flex items-center gap-2 rounded border border-green-200 bg-green-50 px-3 py-1.5 text-sm text-green-800 dark:border-green-500/30 dark:bg-green-500/10 dark:text-green-200">
                                 <span className="font-medium">Full attendance bonus</span>
-                                <span className="text-green-600">· +{formatCurrency(p.ruleGrossAddition ?? 0)}</span>
+                                <span className="text-green-600 dark:text-green-300">· +{formatCurrency(p.ruleGrossAddition ?? 0)}</span>
                               </div>
                             )}
-                            <div><span className="text-gray-500">Advances</span><div className="font-mono text-red-600">-{formatCurrency(p.advanceDeductions)}</div></div>
-                            <div><span className="text-gray-500">Loans</span><div className="font-mono text-red-600">-{formatCurrency(p.loanDeductions)}</div></div>
-                            <div><span className="text-gray-500">Bonus</span><div className="font-mono text-green-600">+{formatCurrency(p.bonus)}</div></div>
+                            <div><span className="text-muted-foreground">Advances</span><div className="font-mono text-red-600 dark:text-red-400">-{formatCurrency(p.advanceDeductions)}</div></div>
+                            <div><span className="text-muted-foreground">Loans</span><div className="font-mono text-red-600 dark:text-red-400">-{formatCurrency(p.loanDeductions)}</div></div>
+                            <div><span className="text-muted-foreground">Bonus</span><div className="font-mono text-green-600 dark:text-green-300">+{formatCurrency(p.bonus)}</div></div>
                           </div>
                         )}
                         {!p.error && (
-                          <div className="flex items-center gap-3 pt-2 border-t">
-                            <label className="text-sm text-gray-600">Override released amount:</label>
+                          <div className="flex items-center gap-3 border-t border-border pt-2">
+                            <label className="text-sm text-muted-foreground">Override released amount:</label>
                             <Input
                               type="number"
                               min="0"
@@ -595,7 +596,7 @@ export function SalaryReleasesPage() {
                           </button>
                         )}
                         {isExpanded && p.dayBreakdown && (
-                          <div className="rounded border overflow-hidden">
+                          <div className="overflow-hidden rounded border border-border">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -609,7 +610,7 @@ export function SalaryReleasesPage() {
                               </TableHeader>
                               <TableBody>
                                 {p.dayBreakdown.map((d) => (
-                                  <TableRow key={d.date} className={d.paidLeave ? 'bg-green-50' : d.status === 'ABSENT' ? 'opacity-40' : ''}>
+                                  <TableRow key={d.date} className={d.paidLeave ? 'bg-green-50 dark:bg-green-500/10' : d.status === 'ABSENT' ? 'opacity-40' : ''}>
                                     <TableCell className="text-xs">{d.date}</TableCell>
                                     <TableCell className="text-xs">{d.roleName || '-'}</TableCell>
                                     <TableCell className="font-mono text-xs">{formatCurrency(d.personalRate)}</TableCell>
@@ -642,27 +643,27 @@ export function SalaryReleasesPage() {
               {wizardStep === 'confirm' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">Notes (optional)</label>
+                    <label className="mb-1 block text-sm font-medium text-foreground">Notes (optional)</label>
                     <textarea
-                      className="w-full h-20 rounded-md border border-input bg-background px-3 py-2 text-sm resize-none"
+                      className="h-20 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm"
                       placeholder="Notes for these releases..."
                       value={wizardNotes}
                       onChange={(e) => setWizardNotes(e.target.value)}
                     />
                   </div>
-                  <div className="rounded-lg border p-4 space-y-2">
+                  <div className="space-y-2 rounded-lg border border-border p-4">
                     <p className="text-sm font-medium">Summary</p>
                     {previews.filter((p) => !p.error).map((p) => {
                       const emp = employees.find((e) => e.id === p.employeeId);
                       const released = Number(wizardReleasedOverrides[p.employeeId] ?? p.releasedAmount);
                       return (
                         <div key={p.employeeId} className="flex justify-between text-sm">
-                          <span className="text-gray-600">{emp?.fullName}</span>
+                          <span className="text-muted-foreground">{emp?.fullName}</span>
                           <span className="font-mono font-medium">{formatCurrency(released)}</span>
                         </div>
                       );
                     })}
-                    <div className="border-t pt-2 flex justify-between font-semibold">
+                    <div className="flex justify-between border-t border-border pt-2 font-semibold">
                       <span>Total</span>
                       <span className="font-mono">
                         {formatCurrency(
@@ -688,7 +689,7 @@ export function SalaryReleasesPage() {
             </div>
           </div>
         </div>
-      )}
+      ), document.body)}
       </>
       )}
     </MainLayout>
