@@ -1,7 +1,7 @@
 # ISM Salary System — Complete System Documentation
 
-**Last updated:** 2026-04-28  
-**Status:** Active development — DB migration 015 pending execution  
+**Last updated:** 2026-04-29  
+**Status:** Active development — migrations 015–020 executed on MariaDB
 
 ---
 
@@ -30,6 +30,7 @@ ISM Salary System is an internal HR/payroll management system for ISM Group. It 
 - Employee records, departments, and roles
 - Daily attendance marking with role rotation support
 - Two salary types: **FIXED** (monthly) and **DAILY_WAGE** (per-present-day)
+- Department-level payroll rules (paid leave days, full attendance bonus days)
 - Unified salary releases (replaces old fragmented payroll tables)
 - Loan management with installment scheduling
 - Advance salary requests and approvals
@@ -49,7 +50,7 @@ All users route through `/admin/*`. There is no employee self-service portal.
 |---|---|
 | Runtime | Node.js + TypeScript |
 | Framework | Express.js |
-| Database | MySQL 8+ (InnoDB, utf8mb4) |
+| Database | MariaDB (InnoDB, utf8mb4) — `dateStrings: true` in pool config so DATE columns return as `"YYYY-MM-DD"` strings |
 | Auth | JWT (jsonwebtoken) — Bearer header or `?token=` query param |
 | Validation | Zod schemas via `validate.middleware.ts` |
 | Password hashing | bcrypt (salt rounds: 10) |
@@ -77,82 +78,84 @@ All users route through `/admin/*`. There is no employee self-service portal.
 
 ```
 ISM-Salary-System/
+├── .github/workflows/
+│   ├── client-deploy.yml             # Vite build → Nginx on VPS
+│   └── server-deploy.yml             # tsc build → pm2 on VPS (NODE_OPTIONS=--max-old-space-size=512 for npm ci)
 ├── server/
 │   └── src/
 │       ├── app.ts                        # Express app setup, middleware, route mounts
 │       ├── server.ts                     # HTTP server entry point
 │       ├── types/index.ts                # AuthRequest, AuthUser, UserRole types
 │       ├── controllers/
-│       │   ├── auth.controller.ts        # login, register, me
-│       │   ├── attendance.controller.ts  # getAttendance, getDailyAttendance, create, update
-│       │   ├── dashboard.controller.ts   # getStats, getSalaryTrends, getDeptDistribution, etc.
-│       │   ├── departments.controller.ts # CRUD departments
-│       │   ├── employees.controller.ts   # CRUD employees
-│       │   ├── exports.controller.ts     # exportPayroll (CSV), generatePayslip (PDF)
-│       │   ├── loans.controller.ts       # CRUD loans, installments, extendLoan
-│       │   ├── advanceSalaries.controller.ts # CRUD advance requests, approve/reject
-│       │   ├── salaryHistory.controller.ts   # employee_salary_history increments
-│       │   ├── salaryReleases.controller.ts  # unified payroll — preview, create, release
-│       │   ├── users.controller.ts       # admin user management
-│       │   ├── roles.controller.ts       # CRUD roles
-│       │   └── auditLogs.controller.ts   # read audit_logs
+│       │   ├── auth.controller.ts
+│       │   ├── attendance.controller.ts  # getAttendance, getDailyAttendance, createAttendance (upsert), updateAttendance, getEmployeeAttendanceCalendar
+│       │   ├── dashboard.controller.ts
+│       │   ├── departments.controller.ts
+│       │   ├── departmentRules.controller.ts  # NEW — getDepartmentRules, upsertDepartmentRules, deleteDepartmentRules
+│       │   ├── employees.controller.ts
+│       │   ├── exports.controller.ts
+│       │   ├── loans.controller.ts
+│       │   ├── advanceSalaries.controller.ts
+│       │   ├── salaryHistory.controller.ts
+│       │   ├── salaryReleases.controller.ts   # preview, batch, create, release, getEmployeeCalendar; includes dept rules logic
+│       │   ├── users.controller.ts
+│       │   ├── roles.controller.ts
+│       │   └── auditLogs.controller.ts
 │       ├── middleware/
-│       │   ├── auth.middleware.ts        # JWT verification (Bearer + ?token= fallback)
-│       │   ├── rbac.middleware.ts        # role-based access control
-│       │   ├── validate.middleware.ts    # Zod schema validation
-│       │   └── auditLog.middleware.ts    # auto audit logging on mutations
-│       ├── routes/                       # one file per resource
+│       │   ├── auth.middleware.ts
+│       │   ├── rbac.middleware.ts
+│       │   ├── validate.middleware.ts
+│       │   └── auditLog.middleware.ts
+│       ├── routes/
+│       │   ├── departmentRules.routes.ts  # NEW
+│       │   └── ... (one file per resource)
 │       ├── utils/
-│       │   ├── db.ts                     # query(), queryOne(), execute(), generateId()
-│       │   ├── auditLog.ts               # writeAuditLog(), AuditAction enum
-│       │   ├── fileStorage.ts            # multer upload config
-│       │   └── pagination.ts            # pagination helpers
-│       ├── validation/schemas.ts         # all Zod schemas
+│       │   ├── db.ts                     # query(), queryOne(), execute(), generateId(); dateStrings:true
+│       │   ├── auditLog.ts
+│       │   ├── fileStorage.ts
+│       │   └── pagination.ts
+│       ├── validation/schemas.ts         # all Zod schemas incl. upsertDepartmentRulesSchema
 │       └── database/
-│           ├── setup/                    # initial schema + seed SQL files
+│           ├── setup/
 │           └── migrations/
-│               ├── 006–014_*.sql         # historical migrations (already run)
-│               └── 015_salary_releases_overhaul.sql  # ⚠️ PENDING EXECUTION
+│               ├── 006–014_*.sql         # historical (already run)
+│               ├── 015_salary_releases_overhaul.sql      # executed ✓
+│               ├── 016_employee_photo_and_auto_employee_id.sql  # executed ✓
+│               ├── 017–019_*.sql         # executed ✓
+│               └── 020_department_rules.sql              # executed ✓
 ├── client/
 │   └── src/
-│       ├── App.tsx                       # route declarations
-│       ├── main.tsx                      # React root with ThemeProvider
-│       ├── index.css                     # Tailwind + CSS variables (light + dark)
+│       ├── App.tsx
+│       ├── main.tsx
+│       ├── index.css
 │       ├── contexts/
-│       │   ├── AuthContext.tsx           # JWT auth state, login/logout
-│       │   └── ThemeContext.tsx          # dark/light mode with localStorage persistence
+│       │   ├── AuthContext.tsx
+│       │   └── ThemeContext.tsx
 │       ├── components/
 │       │   ├── layout/
-│       │   │   ├── MainLayout.tsx        # sidebar + header shell
-│       │   │   ├── Sidebar.tsx           # nav links + dark mode toggle
-│       │   │   └── Header.tsx            # page title + mobile nav + dark mode toggle
-│       │   ├── dashboard/
-│       │   │   └── StatCard.tsx          # animated KPI card
-│       │   └── ui/                       # shadcn/ui primitives
+│       │   └── ui/
 │       ├── pages/
 │       │   ├── auth/LoginPage.tsx
 │       │   └── admin/
 │       │       ├── AdminDashboardPage.tsx
-│       │       ├── AttendanceEntryPage.tsx     # inline dropdown per-row, real-time save
+│       │       ├── AttendanceEntryPage.tsx     # local-state batch save (Save Attendance button)
 │       │       ├── EmployeesPage.tsx
-│       │       ├── EmployeeProfilePage.tsx     # 6-tab decision portal
+│       │       ├── EmployeeProfilePage.tsx     # 6-tab portal; Calendar tab with color-coded boxes
 │       │       ├── EmployeeFormPage.tsx
 │       │       ├── EmployeeAttendanceCalendarPage.tsx
-│       │       ├── DepartmentsPage.tsx
+│       │       ├── DepartmentsPage.tsx         # includes inline Rules panel per department
 │       │       ├── RolesPage.tsx
 │       │       ├── LoansPage.tsx
 │       │       ├── AdvanceSalariesPage.tsx
-│       │       ├── SalaryReleasesPage.tsx      # 3-step wizard + release list
-│       │       ├── UserManagementPage.tsx      # admin-only user table
+│       │       ├── SalaryReleasesPage.tsx      # 3-step wizard; shows paid-leave/bonus rule summary in preview
+│       │       ├── UserManagementPage.tsx
 │       │       ├── ReportsPage.tsx
 │       │       └── AuditLogsPage.tsx
 │       ├── hooks/
-│       │   ├── use-toast.ts
-│       │   └── use-mobile.ts
 │       └── lib/
-│           ├── api.ts                    # all Axios API calls grouped by resource
-│           ├── utils.ts                  # cn(), formatCurrency()
-│           └── formValidation.ts         # isIsoDate(), etc.
+│           ├── api.ts                    # all Axios API calls incl. departmentRulesAPI
+│           ├── utils.ts
+│           └── formValidation.ts
 ```
 
 ---
@@ -187,8 +190,8 @@ salary_type ENUM('FIXED','DAILY_WAGE'),
 base_salary DECIMAL(12,2),   -- monthly for FIXED; daily fallback for DAILY_WAGE
 hire_date DATE, is_active BOOL,
 address_line1, address_line2, city, region,
-photo_url VARCHAR(500), photo_key VARCHAR(500), -- employee photo object URL/key
-user_id FK→users NULL,       -- employee↔login user mapping (migration 014)
+photo_url VARCHAR(500), photo_key VARCHAR(500),
+user_id FK→users NULL,
 created_at, updated_at
 ```
 
@@ -196,7 +199,7 @@ created_at, updated_at
 ```sql
 id CHAR(36) PK, employee_id FK→employees,
 salary_type ENUM('FIXED','DAILY_WAGE'),
-base_salary DECIMAL(12,2),   -- the new rate (absolute, not delta)
+base_salary DECIMAL(12,2),
 effective_from DATE,
 reason VARCHAR(500), notes TEXT,
 changed_by FK→users,
@@ -206,19 +209,32 @@ created_at
 #### `attendance`
 ```sql
 id CHAR(36) PK, employee_id FK→employees,
-role_id CHAR(36) NULL FK→roles ON DELETE SET NULL,  -- ← added by migration 015
+role_id CHAR(36) NULL FK→roles ON DELETE SET NULL,
 date DATE, status ENUM('PRESENT','ABSENT'),
 notes TEXT, created_at, updated_at
 UNIQUE KEY (employee_id, date)
 ```
+
+#### `department_rules`  ← **NEW — migration 020**
+```sql
+id CHAR(36) PK,
+department_id CHAR(36) NOT NULL FK→departments ON DELETE CASCADE,
+paid_leave_days TINYINT NOT NULL DEFAULT 0,        -- first N absences paid at daily rate
+full_attendance_bonus_days TINYINT NOT NULL DEFAULT 0,  -- extra days pay if zero absences
+created_at TIMESTAMP, updated_at TIMESTAMP
+UNIQUE KEY (department_id)   -- one rules profile per department
+```
+
+Rules are optional — departments with no row behave identically to the default (0, 0).  
+Paid leave and full attendance bonus are mutually exclusive (paid leave needs absences > 0; bonus needs absences = 0).
 
 #### `loans`
 ```sql
 id CHAR(36) PK, employee_id FK→employees,
 loan_amount DECIMAL(12,2), remaining_balance DECIMAL(12,2),
 repayment_type ENUM('DAILY','MONTHLY'),
-daily_repayment_amount DECIMAL(12,2) NULL,   -- used when DAILY
-installment_count INT NULL,                   -- used when MONTHLY
+daily_repayment_amount DECIMAL(12,2) NULL,
+installment_count INT NULL,
 status ENUM('ACTIVE','PAID','CANCELLED'),
 start_date DATE, notes TEXT,
 created_at, updated_at
@@ -228,7 +244,7 @@ created_at, updated_at
 ```sql
 id CHAR(36) PK, loan_id FK→loans,
 installment_number INT,
-due_month DATE,              -- first day of the month the installment is due
+due_month DATE,
 amount DECIMAL(12,2),
 status ENUM('PENDING','PAID'),
 paid_at TIMESTAMP NULL,
@@ -244,7 +260,7 @@ approved_by FK→users NULL,
 created_at, updated_at
 ```
 
-#### `salary_releases`  ← **NEW — requires migration 015**
+#### `salary_releases`
 ```sql
 id CHAR(36) PK,
 employee_id FK→employees ON DELETE CASCADE,
@@ -252,13 +268,13 @@ period_start DATE, period_end DATE,
 release_type ENUM('DAILY','WEEKLY','MONTHLY','CUSTOM') DEFAULT 'CUSTOM',
 salary_type ENUM('FIXED','DAILY_WAGE'),
 working_days INT DEFAULT 0,
-gross_amount DECIMAL(12,2) DEFAULT 0,
+gross_amount DECIMAL(12,2) DEFAULT 0,   -- includes paid-leave and bonus rule additions (baked in at create time)
 absent_deduction DECIMAL(12,2) DEFAULT 0,
 advance_deductions DECIMAL(12,2) DEFAULT 0,
 loan_deductions DECIMAL(12,2) DEFAULT 0,
 bonus DECIMAL(12,2) DEFAULT 0,
 calculated_net DECIMAL(12,2) DEFAULT 0,
-released_amount DECIMAL(12,2) DEFAULT 0,  -- what admin actually hands out
+released_amount DECIMAL(12,2) DEFAULT 0,
 status ENUM('DRAFT','RELEASED') DEFAULT 'DRAFT',
 released_by FK→users NULL ON DELETE SET NULL,
 notes TEXT,
@@ -275,60 +291,85 @@ description TEXT NULL,
 changed_at TIMESTAMP
 ```
 
-### Dropped Tables (migration 015 removes these)
-- `salary_calculations` — old fixed-salary monthly table
-- `daily_salary_releases` — old per-day DAILY_WAGE releases
-- `holidays` — business does not use the holidays feature
-- `holiday_employees` — FK child of holidays
+### Dropped Tables (migration 015 removed these)
+- `salary_calculations`, `daily_salary_releases`, `holidays`, `holiday_employees`
 
 ---
 
 ## 5. Business Logic Rules
 
 ### Effective Personal Rate
-`getEffectiveRate(employeeId)` is the authoritative source of truth for a salary calculation:
+`getEffectiveRate(employeeId)`:
 1. Query `employee_salary_history` WHERE `employee_id = ?` AND `salary_type = employee.salary_type` ORDER BY `effective_from DESC LIMIT 1`
 2. If a record exists → `personalRate = history.base_salary`
 3. If no history → `personalRate = employees.base_salary ?? roles.daily_wage ?? 0`
+
+### Department Payroll Rules (DAILY_WAGE only)
+`getDepartmentRulesForEmployee(employeeId)`:
+- Looks up `employees.department_id`, queries `department_rules`
+- Returns `{ paidLeaveDays: 0, fullAttendanceBonusDays: 0 }` if no department or no row (zero-impact default)
+
+Rules are applied inside `buildDailyWagePreview()` after the base calculation:
+
+**Paid leave** (applied when `paidLeaveDays > 0` AND `totalAbsentDays > 0`):
+- `paidLeaveDaysApplied = MIN(paidLeaveDays, totalAbsentDays)`
+- For first N absent days (date order): mark as `paidLeave: true`, add `effectiveRate` to `grossAmount`
+
+**Full attendance bonus** (applied when `fullAttendanceBonusDays > 0` AND `totalAbsentDays === 0` AND `workingDays > 0`):
+- `bonusAmount = personalRate × fullAttendanceBonusDays`
+- Added to `grossAmount`
+
+Rules are mutually exclusive. Both are baked into `gross_amount` at preview/create time — no extra columns in `salary_releases`.
+
+Example (2000 LKR/day, paidLeaveDays=3, fullAttendanceBonusDays=3):
+- 29/31 present (2 absences): `(29 + 2) × 2000 = 62,000`
+- 31/31 present (0 absences): `31 × 2000 + 3 × 2000 = 68,000`
+- 27/31 present (4 absences): `(27 + 3) × 2000 = 60,000` (paid leave capped at 3)
 
 ### DAILY_WAGE Salary Release Calculation
 - For every **PRESENT** attendance record in the period:
   - `effectiveRate = MAX(personalRate, attendance.role.daily_wage)`
   - If `attendance.role_id` is NULL → `roleDailyWage = 0` → `effectiveRate = personalRate`
-- `gross_amount = SUM(effectiveRate for all PRESENT days)`
-- `working_days = COUNT(PRESENT records in period)`
+- `gross_amount = SUM(effectiveRate for PRESENT days) + paid-leave additions + bonus addition`
+- `working_days = COUNT(PRESENT records in period)` (does NOT include paid-leave absent days)
+- `averageDailyRate` computed from present-only gross (before rule additions)
 - `advance_deductions = SUM(approved advance_salaries.amount WHERE advance_date BETWEEN period)`
-- **Loan deductions — DAILY repayment loans:** `SUM(daily_repayment_amount) × working_days`
-- **Loan deductions — MONTHLY repayment loans:** only when `release_type = 'MONTHLY'`; deducts PENDING installments whose `due_month` falls within the period
+- **Loan deductions — DAILY:** `SUM(daily_repayment_amount) × working_days`
+- **Loan deductions — MONTHLY:** only when `release_type = 'MONTHLY'`; deducts PENDING installments whose `due_month` falls within the period
 - `calculated_net = gross - advance_deductions - loan_deductions + bonus`
-- `released_amount` is editable by admin (defaults to `calculated_net`; can be less for partial payout)
 
 ### FIXED Salary Release Calculation
-- Always `release_type = 'MONTHLY'` (period = first day → last day of a calendar month)
+- Always `release_type = 'MONTHLY'`
 - `baseSalary = getEffectiveRate(employeeId).personalRate`
 - `absent_days = COUNT(ABSENT attendance records in period)`
-- **4 paid-offs rule:** `paidOffs = MIN(4, absent_days)` — first 4 absences are always paid, no carry-over
+- **4 paid-offs rule:** `paidOffs = MIN(4, absent_days)` — first 4 absences always paid, no carry-over
 - `excess_absent = MAX(0, absent_days - 4)`
-- `absent_deduction = excess_absent × (baseSalary / 30)` — always divided by 30 regardless of actual month length
+- `absent_deduction = excess_absent × (baseSalary / 30)` — always divided by 30
 - `gross_amount = baseSalary`
 - `calculated_net = gross - absent_deduction - advance_deductions - loan_deductions + bonus`
 
 ### Release Action (DRAFT → RELEASED)
-When an admin releases a salary record:
-1. Status updated to `RELEASED`, `released_by = req.user.id`
-2. **DAILY repayment loans:** `remaining_balance -= loan_deduction_amount`; if `remaining_balance ≤ 0` → `status = 'PAID'`
-3. **MONTHLY repayment loans:** PENDING installments whose `due_month` is within the release period → marked `status = 'PAID'`, `paid_at = NOW()`
-4. Audit log written with `AuditAction.RELEASE`
+1. Status → `RELEASED`, `released_by = req.user.id`
+2. DAILY loans: `remaining_balance -= loan_deduction_amount`; if ≤ 0 → `status = 'PAID'`
+3. MONTHLY loans: PENDING installments in period → `status = 'PAID'`, `paid_at = NOW()`
+4. Audit log: `AuditAction.RELEASE`
 
 ### Release Type Detection (auto)
-- `detectReleaseType(from, to)`:
-  - Same day → `DAILY`
-  - Exactly 7 days → `WEEKLY`
-  - `from` = first of month AND `to` = last of month → `MONTHLY`
-  - Otherwise → `CUSTOM`
+`detectReleaseType(from, to)`:
+- Same day → `DAILY`
+- Exactly 7 days → `WEEKLY`
+- `from` = first of month AND `to` = last of month → `MONTHLY`
+- Otherwise → `CUSTOM`
 
-### Loan extendLoan Bug Fix
-Two separate queries instead of one combined aggregate (prevents MySQL ambiguity bug):
+### Date Handling (critical)
+**Server:** `db.ts` pool uses `dateStrings: true` — all DATE/DATETIME columns return as `"YYYY-MM-DD"` strings, never JS Date objects. Without this, MariaDB DATE columns would serialize as ISO UTC timestamps causing off-by-one dates in UTC+5:30 (Sri Lanka).
+
+**Client:** All local date helpers use `getFullYear()/getMonth()/getDate()` (local time), not `.toISOString().slice(0,10)` (UTC). Applies to date defaults in `AttendanceEntryPage`, date presets in `SalaryReleasesPage`.
+
+**Calendar date normalization:** `EmployeeProfilePage` handles both `"YYYY-MM-DD"` (with `dateStrings:true`) and ISO timestamp strings (fallback) when building `attendanceByDate` map.
+
+### Loan extendLoan (two-query pattern)
+Two separate queries to avoid MySQL/MariaDB aggregate ambiguity:
 ```sql
 -- Step 1
 SELECT MAX(installment_number) AS maxNum FROM loan_installments WHERE loan_id = ?
@@ -343,7 +384,7 @@ SELECT due_month FROM loan_installments WHERE loan_id = ? AND installment_number
 ### Base URL
 `/api` — all routes require `Authorization: Bearer <token>` except `/api/auth/login`
 
-**Auth also accepts `?token=<jwt>` query parameter** — used by export/payslip URLs opened directly in browser.
+**Auth also accepts `?token=<jwt>`** — used by export/payslip URLs opened in browser.
 
 ### Rate Limiting
 - `/api/auth/*` — 20 requests / 15 min
@@ -367,6 +408,13 @@ SELECT due_month FROM loan_installments WHERE loan_id = ? AND installment_number
 | PUT | `/:id` | Update department |
 | DELETE | `/:id` | Delete department |
 
+### Department Rules `/api/department-rules`  ← **NEW**
+| Method | Path | Access | Description |
+|---|---|---|---|
+| GET | `/:departmentId` | Any auth | Get rules for a department (returns `{ paidLeaveDays: 0, fullAttendanceBonusDays: 0 }` if none) |
+| PUT | `/:departmentId` | ADMIN | Upsert rules (body: `{ paidLeaveDays, fullAttendanceBonusDays }`) |
+| DELETE | `/:departmentId` | ADMIN | Remove rules row |
+
 ### Roles `/api/roles`
 | Method | Path | Description |
 |---|---|---|
@@ -380,9 +428,9 @@ SELECT due_month FROM loan_installments WHERE loan_id = ? AND installment_number
 | Method | Path | Description |
 |---|---|---|
 | GET | `/` | List employees (`?isActive`, `?departmentId`, `?search`, `?page`, `?limit`) |
-| GET | `/:id` | Get single employee (includes roleId, roleName, departmentId, salaryType, baseSalary) |
-| GET | `/:id/photo` | Redirect to readable employee photo URL from Contabo storage |
-| POST | `/` | Create employee; `employeeId` is autogenerated; accepts multipart `photo` |
+| GET | `/:id` | Get single employee |
+| GET | `/:id/photo` | Redirect to readable employee photo URL |
+| POST | `/` | Create employee; `employeeId` autogenerated; accepts multipart `photo` |
 | PUT | `/:id` | Update employee; accepts multipart `photo` |
 | DELETE | `/:id` | Deactivate employee |
 
@@ -390,10 +438,10 @@ SELECT due_month FROM loan_installments WHERE loan_id = ? AND installment_number
 | Method | Path | Description |
 |---|---|---|
 | GET | `/` | List attendance records (`?employeeId`, `?from`, `?to`, `?status`) |
-| GET | `/daily` | All records for a single date `?date=YYYY-MM-DD` (includes `roleId`, `roleName`) |
-| POST | `/` | Create/upsert attendance record (body: `{ employeeId, date, status, roleId?, notes? }`) — if `roleId` omitted, defaults to employee's `role_id` |
-| PUT | `/:id` | Update attendance record (accepts `roleId` update) |
-| DELETE | `/:id` | Delete record |
+| GET | `/daily` | All records for a date `?date=YYYY-MM-DD`; defaults to today (local time) |
+| GET | `/employee/:employeeId/calendar` | Employee calendar (`?from=YYYY-MM-DD&to=YYYY-MM-DD`) |
+| POST | `/` | Create/upsert attendance (body: `{ employeeId, date, status, roleId?, notes? }`); `roleId` defaults to employee's `role_id` |
+| PUT | `/:id` | Update attendance record |
 
 ### Loans `/api/loans`
 | Method | Path | Description |
@@ -417,21 +465,21 @@ SELECT due_month FROM loan_installments WHERE loan_id = ? AND installment_number
 ### Salary History `/api/salary-history`
 | Method | Path | Description |
 |---|---|---|
-| GET | `/:employeeId` | All history entries for an employee |
-| POST | `/` | Add increment/change record |
+| GET | `/:employeeId` | All history entries |
+| POST | `/` | Add increment record |
 | DELETE | `/:id` | Remove history entry |
 
 ### Salary Releases `/api/salary-releases`
 | Method | Path | Description |
 |---|---|---|
-| POST | `/preview` | Preview single release (returns day breakdown + deductions, no DB write) |
-| POST | `/batch-preview` | Preview multiple employees at once |
+| POST | `/preview` | Preview single release (applies dept rules; returns `paidLeaveDaysApplied`, `fullAttendanceBonusApplied`, `ruleGrossAddition`) |
+| POST | `/batch-preview` | Preview multiple employees |
 | POST | `/` | Create DRAFT release |
 | POST | `/batch` | Create DRAFT releases for multiple employees |
 | GET | `/` | List releases (`?employeeId`, `?from`, `?to`, `?status`, `?departmentId`, `?page`) |
-| GET | `/:id` | Single release (includes day breakdown for DAILY_WAGE) |
+| GET | `/:id` | Single release (includes day breakdown; `paidLeave: true` on paid-leave days) |
 | GET | `/employee/:id` | All releases for an employee |
-| GET | `/employee/:id/calendar` | Month calendar view (`?month=YYYY-MM` → attendance days + releases) |
+| GET | `/employee/:id/calendar` | Month view (`?month=YYYY-MM` → attendance + releases) |
 | PUT | `/:id` | Update DRAFT (notes, released_amount, bonus) |
 | PUT | `/:id/release` | DRAFT → RELEASED (triggers loan balance updates) |
 | PUT | `/batch-release` | Release multiple (body: `{ ids[] }` or `{ from, to }`) |
@@ -440,73 +488,78 @@ SELECT due_month FROM loan_installments WHERE loan_id = ? AND installment_number
 ### Users `/api/users`  *(ADMIN only)*
 | Method | Path | Description |
 |---|---|---|
-| GET | `/` | List all users (id, username, fullName, role, isActive) |
-| PUT | `/:id/reset-password` | Reset password (body: `{ newPassword: string min 8 }`) |
-| PUT | `/:id/status` | Activate/deactivate (body: `{ isActive: bool }`) — cannot deactivate own account |
+| GET | `/` | List all users |
+| PUT | `/:id/reset-password` | Reset password |
+| PUT | `/:id/status` | Activate/deactivate |
 
 ### Dashboard `/api/dashboard`
 | Method | Path | Description |
 |---|---|---|
-| GET | `/stats` | KPI summary (totalEmployees, activeLoans, pendingAdvances, monthlySalary) |
+| GET | `/stats` | KPI summary |
 | GET | `/salary-trends` | Monthly salary trend (`?months=6`) |
 | GET | `/department-distribution` | Headcount by department |
 | GET | `/attendance-stats` | Present/Absent counts by month |
 | GET | `/loan-breakdown` | Loan status breakdown |
 | GET | `/recent-activity` | Recent audit log entries |
 
-**Note:** `monthlySalary` and `salary-trends` queries gracefully return `0` / empty array if `salary_releases` table doesn't exist yet (migration 015 not run).
-
 ### Exports `/api/exports`
 | Method | Path | Description |
 |---|---|---|
-| GET | `/payroll` | CSV payroll export (`?from`, `?to`, `?departmentId`) — queries `salary_releases` |
-| GET | `/payslip/:employeeId` | PDF payslip (`?month=YYYY-MM`) — uses `salary_releases` |
+| GET | `/payroll` | CSV payroll export (`?from`, `?to`, `?departmentId`) |
+| GET | `/payslip/:employeeId` | PDF payslip (`?month=YYYY-MM`) |
 
 ---
 
 ## 7. Server — Controllers
 
 ### `salaryReleases.controller.ts`
-Key internal helpers:
 
 **`getEffectiveRate(employeeId)`**
 - Returns `{ salaryType, personalRate, baseSalary }`
 - Checks `employee_salary_history` first; falls back to `employees.base_salary` / `roles.daily_wage`
 
-**`buildDailyWagePreview(employeeId, from, to, personalRate)`**
+**`getDepartmentRulesForEmployee(employeeId)`**  ← NEW
+- Queries `department_rules` via employee's `department_id`
+- Returns `{ paidLeaveDays: 0, fullAttendanceBonusDays: 0 }` if no department or no row
+
+**`buildDailyWagePreview(employeeId, from, to, personalRate, rules)`**  ← updated signature
 - JOINs attendance + roles for each record in period
 - `effectiveRate = MAX(personalRate, role.daily_wage)` per PRESENT day
-- Returns `{ dayBreakdown[], workingDays, grossAmount, averageDailyRate }`
+- Applies `rules.paidLeaveDays`: marks first N absent rows as `paidLeave: true`, adds to gross
+- Applies `rules.fullAttendanceBonusDays`: if zero absences, adds bonus days × rate to gross
+- Returns `{ dayBreakdown[], workingDays, grossAmount, averageDailyRate, paidLeaveDaysApplied, fullAttendanceBonusApplied, ruleGrossAddition }`
 
 **`buildFixedPreview(employeeId, from, to, baseSalary)`**
-- Counts ABSENT and PRESENT records
-- Applies 4 paid-off rule, calculates `absentDeduction = excessAbsent × (baseSalary / 30)`
+- Counts ABSENT/PRESENT records
+- 4 paid-offs rule, calculates `absentDeduction = excessAbsent × (baseSalary / 30)`
 - Returns `{ baseSalary, absentDays, paidOffs, excessAbsent, absentDeduction, grossAmount, workingDays }`
 
 **`calculateLoanDeductions(employeeId, from, to, workingDays, isMonthlyPeriod)`**
-- DAILY loans: `SUM(daily_repayment_amount) × workingDays` for all ACTIVE daily loans
+- DAILY loans: `SUM(daily_repayment_amount) × workingDays`
 - MONTHLY loans: only if `isMonthlyPeriod = true`; sums PENDING installments due in period
 
-**`detectReleaseType(from, to)`**
-- Returns `'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM'`
+**`detectReleaseType(from, to)`** — `'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM'`
 
 **`releasePayment` handler**
-- Validates DRAFT status
-- Decrements DAILY loan `remaining_balance`, marks loan PAID if ≤ 0
-- Marks MONTHLY installments PAID where `due_month` is within release period
-- Updates status to RELEASED, sets `released_by`
-- Writes audit log with `AuditAction.RELEASE`
+- Decrements DAILY loan `remaining_balance`; marks PAID if ≤ 0
+- Marks MONTHLY installments PAID within release period
+- Status → RELEASED, audit log written
+
+### `departmentRules.controller.ts`  ← NEW
+- **`getDepartmentRules`**: returns row or `{ paidLeaveDays: 0, fullAttendanceBonusDays: 0 }` if none
+- **`upsertDepartmentRules`**: UPDATE or INSERT based on existence check; validates with `upsertDepartmentRulesSchema`
+- **`deleteDepartmentRules`**: removes row by `department_id`
 
 ### `attendance.controller.ts`
-- `getAttendance` / `getDailyAttendance`: JOIN roles, return `roleId`, `roleName`
-- `createAttendance`: body accepts `roleId`; if omitted, auto-resolves from `employees.role_id`; UPSERT pattern (UPDATE existing or INSERT new)
-- `updateAttendance`: accepts `roleId` in body
+- `getDailyAttendance`: `date` param defaults to today in **local server time** (not UTC)
+- `createAttendance`: upsert — UPDATE existing or INSERT new; auto-resolves `roleId` from `employees.role_id` if omitted
+- `getEmployeeAttendanceCalendar`: route param is `:employeeId`; requires `?from` and `?to`
 
 ### `dashboard.controller.ts`
-- `pendingAdvances`: filtered by `status = 'PENDING'`
-- `monthlySalary` / `getSalaryTrends`: query `salary_releases` table; wrapped in try/catch to return 0/empty if table missing
+- `monthlySalary` / `getSalaryTrends`: query `salary_releases`; wrapped in try/catch returning 0/empty if table missing
 
-### `loans.controller.ts` — extendLoan fix
+### `loans.controller.ts`
+Two-query extendLoan (avoids MySQL/MariaDB aggregate ambiguity):
 ```typescript
 const maxRow = await queryOne<{ maxNum: number }>(
   `SELECT MAX(installment_number) as maxNum FROM loan_installments WHERE loan_id = ?`, [id]);
@@ -518,14 +571,13 @@ const lastRow = currentMax > 0
 ```
 
 ### `users.controller.ts`
-- All endpoints require `role === 'ADMIN'` (checked via `requireAdmin()` helper)
-- `resetPassword`: bcrypt hashes new password, writes audit log
-- `setUserStatus`: prevents admin from deactivating their own account
+- All endpoints require `role === 'ADMIN'`
+- `resetPassword`: bcrypt hash + audit log
+- `setUserStatus`: prevents admin deactivating own account
 
 ### `exports.controller.ts`
-- Queries `salary_releases` (not old `salary_calculations`)
-- CSV maps: `period_start` → month column, `released_amount` → total salary
-- No holiday references
+- Queries `salary_releases` (not old tables)
+- CSV: `period_start` → month, `released_amount` → total salary
 
 ---
 
@@ -533,33 +585,31 @@ const lastRow = currentMax > 0
 
 ### `auth.middleware.ts`
 ```typescript
-// Accepts both header and query param
 const headerToken = req.headers.authorization?.startsWith('Bearer ')
   ? req.headers.authorization.slice(7) : undefined;
 const queryToken = req.query.token as string | undefined;
 const token = headerToken || queryToken;
 ```
-`?token=` fallback enables payslip/CSV URLs opened directly in a browser tab.
 
 ### `validate.middleware.ts`
 Zod schema validation — returns 400 with `{ error, details: [{ field, message }] }` on failure.
 
 ### `rbac.middleware.ts`
-Role-based access control. Roles: `ADMIN > MANAGER`.
+Role-based access control. `ADMIN > MANAGER`.
 
 ### `auditLog.middleware.ts`
 Auto-writes to `audit_logs` on POST/PUT/DELETE to most routes.
 
 ### Schemas (`validation/schemas.ts`)
-Key schemas available:
+Key schemas:
 - `loginSchema`, `registerSchema`
 - `createEmployeeSchema`, `updateEmployeeSchema`
 - `createAttendanceSchema` (includes optional `roleId`)
+- `upsertDepartmentRulesSchema` — `{ paidLeaveDays: int 0–31, fullAttendanceBonusDays: int 0–31 }`  ← NEW
 - `createLoanSchema`, `extendLoanSchema`
 - `createAdvanceSalarySchema`
 - `previewSalaryReleaseSchema`, `createSalaryReleaseSchema`, `batchSalaryReleaseSchema`
-- `resetPasswordSchema`
-- `createSalaryHistorySchema`
+- `resetPasswordSchema`, `createSalaryHistorySchema`
 
 ---
 
@@ -575,7 +625,7 @@ Key schemas available:
 | `/admin/employees/:id` | `EmployeeProfilePage` | Any auth |
 | `/admin/employees/:id/edit` | `EmployeeFormPage` | ADMIN only |
 | `/admin/employees/:id/attendance/calendar` | `EmployeeAttendanceCalendarPage` | Any auth |
-| `/admin/attendance/entry` | `AttendanceEntryPage` | Any auth |
+| `/admin/attendance` | `AttendanceEntryPage` | Any auth |
 | `/admin/departments` | `DepartmentsPage` | Any auth |
 | `/admin/roles` | `RolesPage` | Any auth |
 | `/admin/loans` | `LoansPage` | Any auth |
@@ -585,46 +635,60 @@ Key schemas available:
 | `/admin/audit-logs` | `AuditLogsPage` | ADMIN only |
 | `/admin/users` | `UserManagementPage` | ADMIN only |
 
-All `/admin/*` routes redirect to `/login` if unauthenticated. Unknown paths redirect to `/`.
+All `/admin/*` redirect to `/login` if unauthenticated.
 
 ### Key Page Descriptions
 
 #### `AttendanceEntryPage`
-- Date picker + department filter + search bar at top
-- Employee table: each row has an inline **Status dropdown** (`Present` / `Absent`) styled green/red
-- **Real-time save** on dropdown change — calls `attendanceAPI.create()` immediately
-- Spinner inside dropdown while saving; reverts on failure
-- Toast fires per update: `"[Employee Name] — Present/Absent: Attendance updated"`
-- "Mark All Present" button for bulk-marking filtered employees
-- Live Present/Absent count badges above the table
+- Date picker (defaults to today in **local time**) + department filter + role filter + search
+- Employee table: **Present / Absent toggle buttons** per row (not a dropdown)
+- **Local state** — changes do NOT auto-save to server
+- Unsaved rows: amber background + amber dot next to name
+- **Save Attendance button** — batch-upserts ALL filtered employees via `attendanceAPI.create()` in parallel
+- Save button shows count badge of unsaved rows: `Save Attendance ●12`
+- `savedStatuses` derived from DB records; `unsavedIds` set computed from diff
+- `useEffect` initialises local state from DB on load, preserving pending local edits
+- `markAllPresent` bulk-marks filtered employees in local state only
 - `role_id` sent per row (uses `bulkRole` override or employee's default `roleId`)
 
+#### `DepartmentsPage`  ← updated
+- Create/edit/delete departments
+- **Rules button** per department row — toggles inline rules panel
+- Rules panel: `Paid Leave Days` input + `Full Attendance Bonus Days` input + Save/Clear buttons
+- Rules cached in `rulesCache` state (lazy-fetched on first open per department)
+- Amber **"Rules"** badge next to department name when any rule is non-zero
+- `openRules()`, `saveRules()`, `clearRules()` handlers
+
 #### `EmployeeProfilePage` — 6 tabs
-1. **Overview** — personal info cards, effective salary rate, salary type badge, quick-action links
-2. **Calendar** — month navigation, color-coded attendance days (green/red/grey), salary release bars overlaid
-3. **Releases** — paginated table of this employee's `salary_releases`; "New Release" shortcut
-4. **Increments** — timeline of `employee_salary_history`; "Add Increment" modal (new absolute rate, reason, notes)
-5. **Loans** — loan cards with installment accordion; extend/cancel actions
-6. **Advances** — advance table with status badges; approve/reject actions
+1. **Overview** — personal info, salary config, attendance summary, quick links
+2. **Calendar** — month navigation, color-coded attendance (emerald=Present, red=Absent, white=No record)
+   - Uses `salaryReleasesAPI.getEmployeeCalendar` (`/salary-releases/employee/:id/calendar`)
+   - Date keys normalized: handles `"YYYY-MM-DD"` and ISO timestamp strings
+   - Empty-month hint: "No attendance records for [Month]. Go to Attendance Entry to save records."
+3. **Releases** — table of this employee's `salary_releases`
+4. **Increments** — `employee_salary_history` timeline; "Add Increment" modal
+5. **Loans** — loan cards with installment accordion
+6. **Advances** — advance table with approve/reject actions
 
-#### `SalaryReleasesPage` — 3-step wizard
-1. **Select** — employee dropdown (search) + quick buttons (All Active, By Department) + date range with presets (Today / This Week / This Month / Custom)
-2. **Preview** — calls `/api/salary-releases/preview` or `/batch-preview`
-   - DAILY_WAGE: summary card + expandable day-by-day table (date | role | personal rate | role rate | effective rate | amount)
-   - FIXED: summary card (base salary | absent days | 4 paid-offs | excess | deduction | net)
-   - Both show: advance deductions, loan deductions, calculated net
-3. **Confirm** — editable `released_amount` (pre-filled with `calculated_net`), bonus, notes → creates DRAFT → option to immediately Release
+#### `SalaryReleasesPage` — 3-step wizard  ← updated
+1. **Select** — employee/date range with presets (Today / This Week / This Month / Custom); presets use **local time**
+2. **Preview** — calls `/preview` or `/batch-preview`
+   - DAILY_WAGE: summary card + day-by-day table
+     - Paid-leave absent days: green row + amount + "(paid leave)" label; `paidLeave: true` field
+     - Green rule summary banner: `+N paid leave days · +LKR X` or `Full attendance bonus · +LKR X`
+   - FIXED: summary card (base | absences | 4 paid-offs | excess | deduction | net)
+   - Both show advances, loan deductions, calculated net
+3. **Confirm** — editable `released_amount`, bonus, notes → creates DRAFT → optionally Release
 
-Release list below wizard: filters by date, employee, department, status; detail drawer on row click.
+Preview detail drawer (right panel) also shows paid-leave row styling.
 
 #### `UserManagementPage`
-- Table: username, full name, role badge (purple=ADMIN / blue=MANAGER), status badge (green/grey)
-- "Reset Password" button → modal with password input (min 8 chars)
-- "Activate / Deactivate" toggle button per row
-- ADMIN route only
+- Table: username, full name, role badge, status badge
+- "Reset Password" modal (min 8 chars)
+- "Activate / Deactivate" toggle
 
 #### `AdminDashboardPage`
-- 4 `StatCard` components: Total Employees, Active Loans, Monthly Salary (with trend %), Monthly Advances
+- 4 StatCards: Total Employees, Active Loans, Monthly Salary, Monthly Advances
 - Data from `/api/dashboard/stats`
 
 ---
@@ -633,40 +697,31 @@ Release list below wizard: filters by date, employee, department, status; detail
 
 File: `client/src/lib/api.ts`
 
-Axios instance with:
+Axios instance:
 - `baseURL = VITE_API_URL || 'http://localhost:5002/api'`
-- Request interceptor: attaches `Authorization: Bearer <token>` from `localStorage`
+- Request interceptor: `Authorization: Bearer <token>` from `localStorage`
 - Response interceptor: on 401, clears auth + redirects to `/login`
-
-Employee photo paths returned by the API are resolved through `getApiResourceUrl()`, so Vite dev and same-origin production deployments both load protected photo redirects correctly.
-
-### Server Environment For Employee Photos
-Contabo object storage is S3-compatible. Configure these server env vars before using employee photo upload:
-
-```bash
-CONTABO_S3_ENDPOINT=https://<region>.contabostorage.com
-CONTABO_S3_REGION=<region-or-default>
-CONTABO_S3_BUCKET=<bucket-name>
-CONTABO_S3_ACCESS_KEY_ID=<access-key>
-CONTABO_S3_SECRET_ACCESS_KEY=<secret-key>
-CONTABO_S3_PUBLIC_BASE_URL=<optional-public-base-url>
-CONTABO_S3_FORCE_PATH_STYLE=true
-CONTABO_S3_SIGNED_URL_EXPIRES_SECONDS=300
-```
-
-Photos are stored under `ISMSalarySystem/` and named from `employee-name-phoneNumber-timestamp.ext`.
 
 ### API Groups
 
 **`authAPI`** — `login`, `register`, `logout`, `me`
 
-**`employeesAPI`** — `getAll({ isActive, departmentId, search, page, limit })`, `getById`, `create`, `update`, `delete`
+**`employeesAPI`** — `getAll({ isActive, departmentId, search, page, limit })`, `getById`, `getProfile(id)`, `create`, `update`, `delete`
 
 **`departmentsAPI`** — `getAll`, `create`, `update`, `delete`
 
+**`departmentRulesAPI`**  ← NEW
+```typescript
+{
+  getByDepartment: (deptId) => GET /department-rules/:deptId → { paidLeaveDays, fullAttendanceBonusDays }
+  upsert: (deptId, { paidLeaveDays, fullAttendanceBonusDays }) => PUT /department-rules/:deptId
+  remove: (deptId) => DELETE /department-rules/:deptId
+}
+```
+
 **`rolesAPI`** — `getAll`, `getByDepartment(deptId)`, `create`, `update`, `delete`
 
-**`attendanceAPI`** — `getAll(params)`, `getDaily(date)`, `create({ employeeId, date, status, roleId?, notes? })`, `update(id, data)`, `delete(id)`
+**`attendanceAPI`** — `getAll(params)`, `getDaily(date)`, `getEmployeeAttendanceCalendar(employeeId, { from, to })`, `create({ employeeId, date, status, roleId?, notes? })`, `update(id, data)`
 
 **`loansAPI`** — `getAll`, `getById`, `create`, `update`, `extend(id, count)`, `delete`
 
@@ -680,12 +735,12 @@ Photos are stored under `ISMSalarySystem/` and named from `employee-name-phoneNu
 
 **`dashboardAPI`** — `getStats`, `getSalaryTrends`, `getDepartmentDistribution`, `getAttendanceStats`, `getLoanBreakdown`, `getRecentActivity`
 
-**`exportsAPI`** — `exportPayroll(params)`, `generatePayslip(employeeId, month)` — these return file URLs with `?token=` query param (auth middleware accepts it)
+**`exportsAPI`** — `exportPayroll(params)`, `generatePayslip(employeeId, month)`, `getPayslipUrl(employeeId, month)`
 
 **`auditLogsAPI`** — `getAll(params)`
 
 **Error utilities:**
-- `getApiErrorMessage(error, fallback)` — extracts human-readable message from Axios errors or Zod validation details
+- `getApiErrorMessage(error, fallback)` — extracts human-readable message from Axios errors or Zod details
 - `getApiFieldErrors(error)` — returns `Record<field, message>` for form field-level errors
 
 ---
@@ -693,54 +748,47 @@ Photos are stored under `ISMSalarySystem/` and named from `employee-name-phoneNu
 ## 11. Client — Design System & Theme
 
 ### Dark Mode Architecture
-- **`ThemeContext.tsx`** — React context with `theme: 'light' | 'dark'` and `toggleTheme()`
-- Reads from `localStorage('ism-theme')` on init; falls back to `prefers-color-scheme`
-- Applies `dark` class to `<html>` element
-- Wrapped in `main.tsx` as `<ThemeProvider>` at root
-- Toggle button in both `Sidebar` (desktop) and `Header` (mobile menu)
-- Also available on `LoginPage`
+- **`ThemeContext.tsx`** — `theme: 'light' | 'dark'`, `toggleTheme()`
+- Reads from `localStorage('ism-theme')`; falls back to `prefers-color-scheme`
+- Applies `dark` class to `<html>`
+- Toggle in both `Sidebar` (desktop) and `Header` (mobile)
 
 ### CSS Variables (index.css)
-Two sets: `:root` (light) and `.dark`
 
 | Token | Light | Dark |
 |---|---|---|
-| `--background` | `250 100% 98%` (near-white) | `222 47% 9%` (deep navy) |
-| `--foreground` | `248 50% 15%` (dark indigo text) | `220 20% 95%` (near-white) |
-| `--primary` | `239 84% 67%` (indigo-500) | `239 84% 67%` (indigo-500) |
-| `--accent` | `160 84% 39%` (emerald) | `160 84% 39%` (emerald) |
+| `--background` | `250 100% 98%` | `222 47% 9%` |
+| `--foreground` | `248 50% 15%` | `220 20% 95%` |
+| `--primary` | `239 84% 67%` | `239 84% 67%` |
+| `--accent` | `160 84% 39%` | `160 84% 39%` |
 | `--card` | `0 0% 100%` | `220 35% 14%` |
 | `--sidebar-background` | `0 0% 100%` | `222 47% 7%` |
-| `--sidebar-primary` | `239 84% 67%` | `239 84% 67%` |
 
 ### CSS Component Classes
-Defined in `index.css` `@layer components`:
 
 | Class | Description |
 |---|---|
-| `.app-mesh` | Full-page gradient background (light: soft indigo/violet/emerald orbs; dark: same at 10% intensity) |
-| `.glass-panel` | Glassmorphism card — `bg-white/60 backdrop-blur-xl border-white/50`; dark: `bg-white/5 border-white/10` |
-| `.glass-surface` | Lighter glass — used for secondary containers |
-| `.glass-subtle` | Even lighter glass — inline form sections |
-| `.stat-card` | Extends `.glass-panel` with p-6, hover shadow animation |
+| `.app-mesh` | Full-page gradient background |
+| `.glass-panel` | Glassmorphism card — `bg-white/60 backdrop-blur-xl`; dark: `bg-white/5` |
+| `.glass-surface` | Lighter glass |
+| `.glass-subtle` | Even lighter glass |
+| `.stat-card` | Extends `.glass-panel` with p-6, hover shadow |
 
-> **Important:** `dark:` variant classes cannot be used inside `@apply` in CSS files. Dark mode for CSS classes uses `.dark .class-name {}` selector blocks instead.
+> **Important:** `dark:` variant classes cannot be used inside `@apply`. Dark mode for CSS classes uses `.dark .class-name {}` selector blocks.
 
 ### Typography
-- Font: **Plus Jakarta Sans** (300, 400, 500, 600, 700, italic 400)
-- Applied via `font-sans` (configured in `tailwind.config.ts`)
-- `h1–h6`: `font-semibold tracking-tight`
+- Font: **Plus Jakarta Sans** (300–700 + italic)
+- Applied via `font-sans` in `tailwind.config.ts`
 
-### Color Palette (Tailwind)
-- Primary: `indigo-500 / indigo-600` (`#6366f1`)
+### Color Palette
+- Primary: `indigo-500/600` (`#6366f1`)
 - CTA accent: `emerald-500` (`#10b981`)
 - Destructive: `rose-600`
-- Success: `emerald-600`
 - Warning: `amber-500`
 
 ### Animations
 - `animate-fade-in`, `animate-slide-up`, `animate-scale-in`, `animate-pulse-slow`
-- Framer Motion: page entrance animations on `StatCard` (stagger by index), login panel spring animation
+- Framer Motion: stagger on StatCards, spring on login panel
 - All respect `useReducedMotion()`
 
 ---
@@ -748,11 +796,11 @@ Defined in `index.css` `@layer components`:
 ## 12. Authentication & Authorization
 
 ### JWT Flow
-1. `POST /api/auth/login` → server validates credentials, returns `{ token, user }`
-2. Client stores `token` in `localStorage`, user object in `localStorage`
-3. All API requests: `Authorization: Bearer <token>` header (Axios interceptor)
-4. Export/payslip URLs: `?token=<jwt>` query parameter (auth middleware accepts both)
-5. On 401: Axios interceptor clears localStorage, redirects to `/login`
+1. `POST /api/auth/login` → `{ token, user }`
+2. Client stores in `localStorage`
+3. All requests: `Authorization: Bearer <token>` (Axios interceptor)
+4. Export URLs: `?token=<jwt>` query param
+5. On 401: clears localStorage, redirects to `/login`
 
 ### JWT Payload
 ```typescript
@@ -762,46 +810,36 @@ Defined in `index.css` `@layer components`:
 ### Roles
 | Role | Access |
 |---|---|
-| `ADMIN` | Full access — includes user management, audit logs, employee edit, user status/password |
-| `MANAGER` | Most features — cannot access `/admin/audit-logs`, `/admin/users`, cannot edit employees |
-
-### Protected Routes (client)
-- `ProtectedRoute` wrapper: redirects unauthenticated users to `/login`
-- `RoleRoute adminOnly`: redirects MANAGER users to `/admin/dashboard`
+| `ADMIN` | Full access — user management, audit logs, employee edit, user status/password, department rules write |
+| `MANAGER` | Most features — cannot edit employees, access audit logs/users, or write department rules |
 
 ---
 
 ## 13. Pending Actions
 
-### ⚠️ DB Migration Not Yet Executed
-**Files:**
-- `server/src/database/migrations/015_salary_releases_overhaul.sql`
-- `server/src/database/migrations/016_employee_photo_and_auto_employee_id.sql`
+### ⚠️ Run Migration 020 on MariaDB
+File: `server/src/database/migrations/020_department_rules.sql`
 
-Run this against the MySQL database **once** via MySQL Workbench (or CLI):
-```bash
-mysql -u <user> -p <database> < server/src/database/migrations/015_salary_releases_overhaul.sql
-mysql -u <user> -p <database> < server/src/database/migrations/016_employee_photo_and_auto_employee_id.sql
-```
+Run once in MySQL Workbench (or CLI) against the MariaDB instance.  
+Creates the `department_rules` table. Without it:
+- Department Rules API returns 500 errors
+- Salary previews for departments with rules will fail
 
-**What it does:**
-1. `SET FOREIGN_KEY_CHECKS = 0`
-2. DROP `salary_calculations`, `daily_salary_releases`, `holiday_employees`, `holidays`
-3. `SET FOREIGN_KEY_CHECKS = 1`
-4. `ALTER TABLE attendance ADD COLUMN role_id CHAR(36) NULL` + FK + index
-5. `CREATE TABLE salary_releases` with all columns, FKs, and indexes
-6. `ALTER TABLE employees ADD COLUMN photo_url, photo_key` for Contabo employee photo retrieval
+### Attendance Records Need to Be Saved
+The old `AttendanceEntryPage` auto-save was broken — it only updated UI state, never wrote to DB.  
+The new Save Attendance button batch-upserts all visible employees.  
+**Action:** Go to Attendance Entry, select a date, mark employees, click Save Attendance.  
+The Employee Profile Calendar will show green/red boxes once records exist.
 
-**Until this is run:**
-- Dashboard salary stats return `0` (graceful fallback, no 500 error)
-- Salary Releases page will fail to load (table missing)
-- Attendance role_id column does not exist (attendance still works, but role won't be saved)
-- Employee photo uploads will fail because `photo_url` and `photo_key` do not exist
+### VPS Deployment
+- **OOM kill fix** applied: `server-deploy.yml` now runs `NODE_OPTIONS="--max-old-space-size=512" npm ci --omit=dev`
+- Push to `main` to trigger the GitHub Actions deploy
+- After deploy, PM2 will restart the server — `dateStrings: true` will take effect on the VPS
 
-### After Migration
-- Restart the Node.js server process
-- All salary release, role rotation, and export features become fully operational
+### Known Limitations
+- `EmployeeAttendanceCalendarPage` (full-page standalone calendar at `/admin/employees/:id/attendance/calendar`) uses the attendance API directly — separate from the in-profile Calendar tab which uses the salary releases calendar endpoint. Both query the same `attendance` table.
+- FIXED salary employees get the 4 paid-offs rule regardless of department; department rules only apply to DAILY_WAGE employees.
 
 ---
 
-*Document covers all changes made through 2026-04-28. Generated from live codebase state.*
+*Document covers all changes through 2026-04-29.*

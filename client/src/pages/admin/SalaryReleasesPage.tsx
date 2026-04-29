@@ -455,14 +455,14 @@ export function SalaryReleasesPage() {
       {/* New Release Wizard */}
       {showWizard && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b">
+          <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b flex-shrink-0">
               <h2 className="text-lg font-semibold">New Salary Release</h2>
               <Button variant="ghost" size="sm" onClick={resetWizard}>✕</Button>
             </div>
 
             {/* Step indicators */}
-            <div className="flex gap-1 px-6 py-3 bg-gray-50 border-b text-xs font-medium">
+            <div className="flex gap-1 px-6 py-3 bg-gray-50 border-b text-xs font-medium flex-shrink-0">
               {(['select', 'preview', 'confirm'] as WizardStep[]).map((step, i) => (
                 <span key={step} className={`rounded-full px-3 py-1 ${wizardStep === step ? 'bg-accent text-accent-foreground' : 'text-gray-400'}`}>
                   {i + 1}. {step.charAt(0).toUpperCase() + step.slice(1)}
@@ -470,7 +470,7 @@ export function SalaryReleasesPage() {
               ))}
             </div>
 
-            <div className="p-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 overflow-y-auto flex-1">
 
               {/* Step 1: Select employees + period */}
               {wizardStep === 'select' && (
