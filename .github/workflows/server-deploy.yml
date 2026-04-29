@@ -147,7 +147,7 @@ jobs:
             # Install dependencies
             echo "[INFO] Installing production dependencies..."
             cd "$SERVER_PATH"
-            npm ci --omit=dev
+            NODE_OPTIONS="--max-old-space-size=512" npm ci --omit=dev
 
             # Check if PM2 is available
             export PATH="$PATH:$HOME/.npm-global/bin:$HOME/.local/bin"

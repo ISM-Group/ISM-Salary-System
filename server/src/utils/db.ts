@@ -17,6 +17,7 @@ const getPool = (): Pool => {
       connectionLimit: 10,
       waitForConnections: true,
       queueLimit: 0,
+      dateStrings: true, // return DATE/DATETIME as 'YYYY-MM-DD' strings, not JS Date objects (avoids UTC timezone shift)
     });
   }
   return pool;
