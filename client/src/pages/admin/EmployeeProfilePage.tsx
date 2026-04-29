@@ -147,7 +147,11 @@ export function EmployeeProfilePage() {
   // Build calendar data
   const calData = calendarRes?.data;
   const attendanceByDate: Record<string, any> = {};
-  (calData?.attendance || []).forEach((a: any) => { attendanceByDate[a.date] = a; });
+  // Normalize date keys — MySQL DATE may arrive as full ISO string or Date object
+  (calData?.attendance || []).forEach((a: any) => {
+    const key = String(a.date).slice(0, 10);
+    attendanceByDate[key] = a;
+  });
   const calDays = calendarMonthDays(calYear, calMonth);
   const monthLabel = new Date(calYear, calMonth - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
@@ -296,20 +300,57 @@ export function EmployeeProfilePage() {
                 if (!date) return <div key={i} />;
                 const att = attendanceByDate[date];
                 const day = parseInt(date.slice(8), 10);
-                let bg = 'bg-gray-50 text-gray-400';
-                if (att?.status === 'PRESENT') bg = 'bg-green-100 text-green-800';
-                if (att?.status === 'ABSENT') bg = 'bg-red-100 text-red-700';
+                const isPresent = att?.status === 'PRESENT';
+                const isAbsent = att?.status === 'ABSENT';
+                const hasRecord = !!att;
+
                 return (
                   <div
                     key={date}
-                    className={`${bg} rounded-lg p-2 text-center text-xs min-h-[56px] flex flex-col items-center justify-start gap-1`}
                     title={att ? `${att.status}${att.roleName ? ` — ${att.roleName}` : ''}` : 'No record'}
+                    className={[
+                      'rounded-lg border p-2 min-h-[64px] flex flex-col items-center justify-start gap-1 text-xs transition-colors',
+                      isPresent
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                        : isAbsent
+                          ? 'bg-red-50 border-red-300 text-red-900'
+                          : 'bg-white border-gray-100 text-gray-300',
+                    ].join(' ')}
                   >
-                    <span className="font-medium">{day}</span>
-                    {att?.roleName && <span className="text-[10px] truncate max-w-full opacity-75">{att.roleName}</span>}
+                    <span className={[
+                      'font-semibold text-sm leading-none',
+                      isPresent ? 'text-emerald-700' : isAbsent ? 'text-red-600' : 'text-gray-300',
+                    ].join(' ')}>
+                      {day}
+                    </span>
+                    {isPresent && (
+                      <span className="mt-1 text-[10px] font-medium text-emerald-600 leading-none">Present</span>
+                    )}
+                    {isAbsent && (
+                      <span className="mt-1 text-[10px] font-medium text-red-500 leading-none">Absent</span>
+                    )}
+                    {hasRecord && att.roleName && (
+                      <span className="text-[9px] truncate max-w-full opacity-60 leading-none">{att.roleName}</span>
+                    )}
                   </div>
                 );
               })}
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 text-xs text-gray-500">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded border border-emerald-300 bg-emerald-50" />
+                Present
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded border border-red-300 bg-red-50" />
+                Absent
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded border border-gray-100 bg-white" />
+                No record
+              </span>
             </div>
             {/* Release bars */}
             {(calData?.releases || []).length > 0 && (
