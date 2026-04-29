@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { attendanceAPI, employeesAPI, departmentsAPI, rolesAPI, getApiErrorMessage } from '@/lib/api';
@@ -8,104 +8,17 @@ import { Badge } from '@/components/ui/badge';
 import { PageSkeleton, TableLoadingRows } from '@/components/ui/loading-spinner';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { Search, CalendarDays, Users, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Search, CalendarDays, Users, CheckCircle2, XCircle, Save, Loader2 } from 'lucide-react';
 
 type AttendanceStatus = 'PRESENT' | 'ABSENT';
-
-function StatusDropdown({
-  employeeId,
-  employeeName,
-  date,
-  roleId,
-  initialStatus,
-  existingRecordId,
-  onSaved,
-}: {
-  employeeId: string;
-  employeeName: string;
-  date: string;
-  roleId: string | null;
-  initialStatus: AttendanceStatus;
-  existingRecordId?: string;
-  onSaved: () => void;
-}) {
-  const [status, setStatus] = useState<AttendanceStatus>(initialStatus);
-  const [saving, setSaving] = useState(false);
-  const { toast } = useToast();
-  const isFirstRender = useRef(true);
-
-  // Sync when date or external data changes
-  useEffect(() => {
-    setStatus(initialStatus);
-    isFirstRender.current = true;
-  }, [initialStatus, date]);
-
-  const handleChange = async (newStatus: AttendanceStatus) => {
-    if (newStatus === status && !isFirstRender.current) return;
-    isFirstRender.current = false;
-    setStatus(newStatus);
-    setSaving(true);
-    try {
-      await attendanceAPI.create({
-        employeeId,
-        date,
-        status: newStatus,
-        notes: '',
-        roleId,
-      });
-      onSaved();
-      toast({
-        title: `${employeeName} — ${newStatus === 'PRESENT' ? 'Present' : 'Absent'}`,
-        description: 'Attendance updated',
-      });
-    } catch (err) {
-      setStatus(status); // revert
-      toast({
-        title: getApiErrorMessage(err, 'Failed to update attendance'),
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="relative">
-        <select
-          value={status}
-          onChange={(e) => handleChange(e.target.value as AttendanceStatus)}
-          disabled={saving}
-          className={cn(
-            'h-8 rounded-lg border px-2 pr-6 text-xs font-medium transition-colors cursor-pointer appearance-none',
-            status === 'PRESENT'
-              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-400'
-              : 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-400',
-            saving && 'opacity-60 cursor-not-allowed'
-          )}
-        >
-          <option value="PRESENT">Present</option>
-          <option value="ABSENT">Absent</option>
-        </select>
-        <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2">
-          {saving ? (
-            <Loader2 className="h-3 w-3 animate-spin text-current" />
-          ) : (
-            <svg className="h-3 w-3 text-current opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export function AttendanceEntryPage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [departmentId, setDepartmentId] = useState('');
   const [search, setSearch] = useState('');
   const [bulkRole, setBulkRole] = useState('');
+  const [localStatuses, setLocalStatuses] = useState<Record<string, AttendanceStatus>>({});
+  const [saving, setSaving] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -143,11 +56,24 @@ export function AttendanceEntryPage() {
 
   const records: any[] = useMemo(() => dailyData || [], [dailyData]);
 
-  const recordsByEmployee = useMemo(() => {
-    const m: Record<string, any> = {};
-    records.forEach((r: any) => { if (r.employeeId) m[r.employeeId] = r; });
+  // What's actually saved in the DB for this date
+  const savedStatuses = useMemo(() => {
+    const m: Record<string, AttendanceStatus> = {};
+    records.forEach((r: any) => { if (r.employeeId) m[r.employeeId] = r.status; });
     return m;
   }, [records]);
+
+  // Initialise local state whenever DB data or employee list changes
+  useEffect(() => {
+    setLocalStatuses((prev) => {
+      const next: Record<string, AttendanceStatus> = {};
+      employees.forEach((e: any) => {
+        // Prefer saved DB value, then any existing local edit, then default PRESENT
+        next[e.id] = savedStatuses[e.id] ?? prev[e.id] ?? 'PRESENT';
+      });
+      return next;
+    });
+  }, [dailyData, employees]);
 
   const filteredEmployees = useMemo(() => {
     const list = employees || [];
@@ -158,33 +84,61 @@ export function AttendanceEntryPage() {
     );
   }, [employees, search]);
 
+  // An employee is "unsaved" if their local status differs from what's in the DB,
+  // OR if no DB record exists yet (new record needed)
+  const unsavedIds = useMemo(() => {
+    return new Set(
+      filteredEmployees
+        .filter((e: any) => localStatuses[e.id] !== savedStatuses[e.id] || !(e.id in savedStatuses))
+        .map((e: any) => e.id)
+    );
+  }, [filteredEmployees, localStatuses, savedStatuses]);
+
   const presentCount = useMemo(
-    () => filteredEmployees.filter((e: any) => {
-      const rec = recordsByEmployee[e.id];
-      return rec ? rec.status === 'PRESENT' : true;
-    }).length,
-    [filteredEmployees, recordsByEmployee]
+    () => filteredEmployees.filter((e: any) => (localStatuses[e.id] ?? 'PRESENT') === 'PRESENT').length,
+    [filteredEmployees, localStatuses]
   );
   const absentCount = filteredEmployees.length - presentCount;
-  const isInitialLoading = isEmployeesLoading && isDepartmentsLoading && isDailyLoading;
-  const isTableLoading = isEmployeesLoading || isDeptEmployeesLoading || isDailyLoading || (departmentId ? isRolesLoading : false);
 
-  const markAllPresent = async () => {
-    const toUpdate = filteredEmployees.filter((e: any) => {
-      const rec = recordsByEmployee[e.id];
-      return !rec || rec.status !== 'PRESENT';
+  const setStatus = (empId: string, status: AttendanceStatus) => {
+    setLocalStatuses((prev) => ({ ...prev, [empId]: status }));
+  };
+
+  const markAllPresent = () => {
+    setLocalStatuses((prev) => {
+      const next = { ...prev };
+      filteredEmployees.forEach((e: any) => { next[e.id] = 'PRESENT'; });
+      return next;
     });
-    if (!toUpdate.length) return;
+  };
+
+  const saveAttendance = async () => {
+    if (!filteredEmployees.length) return;
+    setSaving(true);
     try {
-      await Promise.all(toUpdate.map((e: any) =>
-        attendanceAPI.create({ employeeId: e.id, date, status: 'PRESENT', notes: '', roleId: bulkRole || null })
-      ));
+      await Promise.all(
+        filteredEmployees.map((e: any) =>
+          attendanceAPI.create({
+            employeeId: e.id,
+            date,
+            status: localStatuses[e.id] ?? 'PRESENT',
+            notes: '',
+            roleId: bulkRole || e.roleId || null,
+          })
+        )
+      );
       await refetch();
-      toast({ title: `Marked ${toUpdate.length} employee(s) Present` });
+      queryClient.invalidateQueries({ queryKey: ['attendance-daily', date] });
+      toast({ title: `Attendance saved — ${filteredEmployees.length} employee(s)` });
     } catch (err) {
-      toast({ title: getApiErrorMessage(err, 'Failed to mark all present'), variant: 'destructive' });
+      toast({ title: getApiErrorMessage(err, 'Failed to save attendance'), variant: 'destructive' });
+    } finally {
+      setSaving(false);
     }
   };
+
+  const isInitialLoading = isEmployeesLoading && isDepartmentsLoading && isDailyLoading;
+  const isTableLoading = isEmployeesLoading || isDeptEmployeesLoading || isDailyLoading || (departmentId ? isRolesLoading : false);
 
   return (
     <MainLayout title="Attendance Entry" description="Record daily attendance for employees">
@@ -260,6 +214,27 @@ export function AttendanceEntryPage() {
               <CheckCircle2 className="h-4 w-4" />
               Mark All Present
             </Button>
+
+            <Button
+              size="sm"
+              onClick={saveAttendance}
+              disabled={saving || filteredEmployees.length === 0}
+              className="h-9 gap-1.5"
+            >
+              {saving ? (
+                <><Loader2 className="h-4 w-4 animate-spin" />Saving...</>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  Save Attendance
+                  {unsavedIds.size > 0 && (
+                    <span className="ml-1 rounded-full bg-white/20 px-1.5 text-xs font-bold">
+                      {unsavedIds.size}
+                    </span>
+                  )}
+                </>
+              )}
+            </Button>
           </div>
         </div>
 
@@ -278,6 +253,11 @@ export function AttendanceEntryPage() {
               <XCircle className="mr-1 h-3 w-3" />
               {absentCount} Absent
             </Badge>
+            {unsavedIds.size > 0 && (
+              <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                ● {unsavedIds.size} unsaved
+              </span>
+            )}
           </div>
         )}
 
@@ -309,15 +289,22 @@ export function AttendanceEntryPage() {
                   </tr>
                 ) : (
                   filteredEmployees.map((emp: any) => {
-                    const rec = recordsByEmployee[emp.id];
-                    const currentStatus: AttendanceStatus = rec ? rec.status : 'PRESENT';
+                    const status = localStatuses[emp.id] ?? 'PRESENT';
+                    const isUnsaved = unsavedIds.has(emp.id);
+                    const rec = records.find((r: any) => r.employeeId === emp.id);
                     return (
                       <tr
                         key={emp.id}
-                        className="transition-colors hover:bg-white/20 dark:hover:bg-white/4"
+                        className={cn(
+                          'transition-colors hover:bg-white/20 dark:hover:bg-white/4',
+                          isUnsaved && 'bg-amber-50/40 dark:bg-amber-900/10'
+                        )}
                       >
                         <td className="px-5 py-3 font-medium text-slate-900 dark:text-slate-100">
-                          {emp.fullName}
+                          <span>{emp.fullName}</span>
+                          {isUnsaved && (
+                            <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-amber-500 align-middle" title="Unsaved change" />
+                          )}
                         </td>
                         <td className="px-5 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">
                           {emp.employeeId}
@@ -326,17 +313,30 @@ export function AttendanceEntryPage() {
                           {rec?.roleName || emp.roleName || <span className="text-slate-400 dark:text-slate-500 italic text-xs">default</span>}
                         </td>
                         <td className="px-5 py-3">
-                          <StatusDropdown
-                            employeeId={emp.id}
-                            employeeName={emp.fullName}
-                            date={date}
-                            roleId={bulkRole || emp.roleId || null}
-                            initialStatus={currentStatus}
-                            existingRecordId={rec?.id}
-                            onSaved={() => {
-                              queryClient.invalidateQueries({ queryKey: ['attendance-daily', date] });
-                            }}
-                          />
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={() => setStatus(emp.id, 'PRESENT')}
+                              className={cn(
+                                'rounded-lg border px-3 py-1 text-xs font-medium transition-colors',
+                                status === 'PRESENT'
+                                  ? 'border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+                                  : 'border-slate-200 bg-transparent text-slate-400 hover:border-emerald-200 hover:text-emerald-600 dark:border-slate-700 dark:text-slate-500'
+                              )}
+                            >
+                              Present
+                            </button>
+                            <button
+                              onClick={() => setStatus(emp.id, 'ABSENT')}
+                              className={cn(
+                                'rounded-lg border px-3 py-1 text-xs font-medium transition-colors',
+                                status === 'ABSENT'
+                                  ? 'border-red-300 bg-red-100 text-red-800 dark:border-red-800 dark:bg-red-900/50 dark:text-red-300'
+                                  : 'border-slate-200 bg-transparent text-slate-400 hover:border-red-200 hover:text-red-600 dark:border-slate-700 dark:text-slate-500'
+                              )}
+                            >
+                              Absent
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
