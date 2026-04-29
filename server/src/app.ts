@@ -22,6 +22,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import exportsRoutes from './routes/exports.routes';
 import salaryReleasesRoutes from './routes/salaryReleases.routes';
 import usersRoutes from './routes/users.routes';
+import departmentRulesRoutes from './routes/departmentRules.routes';
 
 const app: Application = express();
 const isProduction = process.env.NODE_ENV === 'production';
@@ -95,6 +96,7 @@ app.get('/health', async (req: Request, res: Response) => {
 
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/departments', departmentsRoutes);
+app.use('/api/department-rules', departmentRulesRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/employees', employeesRoutes);
 app.use('/api/attendance', attendanceRoutes);

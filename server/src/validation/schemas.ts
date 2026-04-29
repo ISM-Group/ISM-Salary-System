@@ -82,6 +82,12 @@ export const updateDepartmentSchema = z.object({
   description: z.string().max(1000).nullable().optional(),
 });
 
+// PUBLIC_INTERFACE
+export const upsertDepartmentRulesSchema = z.object({
+  paidLeaveDays: z.number().int().min(0).max(31),
+  fullAttendanceBonusDays: z.number().int().min(0).max(31),
+});
+
 // ─── Role Schemas ────────────────────────────────────────────────────
 
 // PUBLIC_INTERFACE

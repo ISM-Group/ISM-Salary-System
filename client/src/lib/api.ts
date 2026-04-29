@@ -408,6 +408,15 @@ export const departmentsAPI = {
   },
 };
 
+// Department Rules API
+// PUBLIC_INTERFACE
+export const departmentRulesAPI = {
+  getByDepartment: (deptId: string) => api.get(`/department-rules/${deptId}`).then((r) => r.data.data as { paidLeaveDays: number; fullAttendanceBonusDays: number }),
+  upsert: (deptId: string, data: { paidLeaveDays: number; fullAttendanceBonusDays: number }) =>
+    api.put(`/department-rules/${deptId}`, data).then((r) => r.data.data),
+  remove: (deptId: string) => api.delete(`/department-rules/${deptId}`).then((r) => r.data),
+};
+
 // Roles API
 // PUBLIC_INTERFACE
 /**

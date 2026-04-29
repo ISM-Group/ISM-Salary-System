@@ -36,6 +36,30 @@ async function getEffectiveRate(employeeId: string): Promise<EffectiveRate> {
   return { salaryType, personalRate, baseSalary: personalRate };
 }
 
+interface DepartmentRules {
+  paidLeaveDays: number;
+  fullAttendanceBonusDays: number;
+}
+
+async function getDepartmentRulesForEmployee(employeeId: string): Promise<DepartmentRules> {
+  const emp = await queryOne<{ department_id: string | null }>(
+    'SELECT department_id FROM employees WHERE id = ?',
+    [employeeId]
+  );
+  if (!emp?.department_id) return { paidLeaveDays: 0, fullAttendanceBonusDays: 0 };
+
+  const rules = await queryOne<any>(
+    'SELECT paid_leave_days, full_attendance_bonus_days FROM department_rules WHERE department_id = ?',
+    [emp.department_id]
+  );
+  if (!rules) return { paidLeaveDays: 0, fullAttendanceBonusDays: 0 };
+
+  return {
+    paidLeaveDays: Number(rules.paid_leave_days) || 0,
+    fullAttendanceBonusDays: Number(rules.full_attendance_bonus_days) || 0,
+  };
+}
+
 interface DayEntry {
   date: string;
   status: 'PRESENT' | 'ABSENT';
@@ -45,14 +69,26 @@ interface DayEntry {
   personalRate: number;
   effectiveRate: number;
   amount: number;
+  paidLeave: boolean;
+}
+
+interface DailyWagePreviewResult {
+  dayBreakdown: DayEntry[];
+  workingDays: number;
+  grossAmount: number;
+  averageDailyRate: number;
+  paidLeaveDaysApplied: number;
+  fullAttendanceBonusApplied: boolean;
+  ruleGrossAddition: number;
 }
 
 async function buildDailyWagePreview(
   employeeId: string,
   from: string,
   to: string,
-  personalRate: number
-): Promise<{ dayBreakdown: DayEntry[]; workingDays: number; grossAmount: number; averageDailyRate: number }> {
+  personalRate: number,
+  rules: DepartmentRules
+): Promise<DailyWagePreviewResult> {
   const rows = await query<any>(
     `SELECT a.date, a.status, a.role_id as roleId, r.name as roleName,
             COALESCE(r.daily_wage, 0) as roleDailyWage
@@ -68,9 +104,8 @@ async function buildDailyWagePreview(
   const dayBreakdown: DayEntry[] = rows.map((r: any) => {
     const roleDailyWage = Number(r.roleDailyWage) || 0;
     const effectiveRate = r.status === 'PRESENT' ? Math.max(personalRate, roleDailyWage) : 0;
-    const amount = effectiveRate;
     if (r.status === 'PRESENT') {
-      grossAmount += amount;
+      grossAmount += effectiveRate;
       workingDays++;
     }
     return {
@@ -81,12 +116,47 @@ async function buildDailyWagePreview(
       roleDailyWage,
       personalRate,
       effectiveRate,
-      amount,
+      amount: effectiveRate,
+      paidLeave: false,
     };
   });
 
   const averageDailyRate = workingDays > 0 ? grossAmount / workingDays : 0;
-  return { dayBreakdown, workingDays, grossAmount, averageDailyRate };
+  const totalAbsentDays = dayBreakdown.filter((d) => d.status === 'ABSENT').length;
+  let paidLeaveDaysApplied = 0;
+  let fullAttendanceBonusApplied = false;
+  let ruleGrossAddition = 0;
+
+  if (rules.paidLeaveDays > 0 && totalAbsentDays > 0) {
+    paidLeaveDaysApplied = Math.min(rules.paidLeaveDays, totalAbsentDays);
+    let applied = 0;
+    for (const entry of dayBreakdown) {
+      if (applied >= paidLeaveDaysApplied) break;
+      if (entry.status === 'ABSENT') {
+        const rate = Math.max(personalRate, entry.roleDailyWage);
+        entry.paidLeave = true;
+        entry.effectiveRate = rate;
+        entry.amount = rate;
+        grossAmount += rate;
+        ruleGrossAddition += rate;
+        applied++;
+      }
+    }
+  } else if (rules.fullAttendanceBonusDays > 0 && totalAbsentDays === 0 && workingDays > 0) {
+    fullAttendanceBonusApplied = true;
+    ruleGrossAddition = personalRate * rules.fullAttendanceBonusDays;
+    grossAmount += ruleGrossAddition;
+  }
+
+  return {
+    dayBreakdown,
+    workingDays,
+    grossAmount,
+    averageDailyRate,
+    paidLeaveDaysApplied,
+    fullAttendanceBonusApplied,
+    ruleGrossAddition,
+  };
 }
 
 interface FixedPreview {
@@ -226,12 +296,21 @@ export const previewRelease = async (req: AuthRequest, res: Response): Promise<v
     let absentDeduction = 0;
     let dayBreakdown: DayEntry[] = [];
     let fixedMeta: FixedPreview | null = null;
+    let paidLeaveDaysApplied = 0;
+    let fullAttendanceBonusApplied = false;
+    let ruleGrossAddition = 0;
+    let averageDailyRate = 0;
 
     if (salaryType === 'DAILY_WAGE') {
-      const preview = await buildDailyWagePreview(employeeId, periodStart, periodEnd, personalRate);
+      const rules = await getDepartmentRulesForEmployee(employeeId);
+      const preview = await buildDailyWagePreview(employeeId, periodStart, periodEnd, personalRate, rules);
       grossAmount = preview.grossAmount;
       workingDays = preview.workingDays;
       dayBreakdown = preview.dayBreakdown;
+      averageDailyRate = preview.averageDailyRate;
+      paidLeaveDaysApplied = preview.paidLeaveDaysApplied;
+      fullAttendanceBonusApplied = preview.fullAttendanceBonusApplied;
+      ruleGrossAddition = preview.ruleGrossAddition;
     } else {
       fixedMeta = await buildFixedPreview(employeeId, periodStart, periodEnd, baseSalary);
       grossAmount = fixedMeta.grossAmount;
@@ -262,7 +341,13 @@ export const previewRelease = async (req: AuthRequest, res: Response): Promise<v
         bonus: bonusNum,
         calculatedNet,
         releasedAmount: calculatedNet,
-        ...(salaryType === 'DAILY_WAGE' ? { dayBreakdown, averageDailyRate: workingDays > 0 ? grossAmount / workingDays : 0 } : {}),
+        ...(salaryType === 'DAILY_WAGE' ? {
+          dayBreakdown,
+          averageDailyRate,
+          paidLeaveDaysApplied,
+          fullAttendanceBonusApplied,
+          ruleGrossAddition,
+        } : {}),
         ...(fixedMeta ? { absentDays: fixedMeta.absentDays, paidOffs: fixedMeta.paidOffs, excessAbsent: fixedMeta.excessAbsent } : {}),
       },
     });
@@ -291,11 +376,20 @@ export const batchPreview = async (req: AuthRequest, res: Response): Promise<voi
           let grossAmount = 0;
           let workingDays = 0;
           let absentDeduction = 0;
+          let paidLeaveDaysApplied = 0;
+          let fullAttendanceBonusApplied = false;
+          let ruleGrossAddition = 0;
+          let averageDailyRate = 0;
 
           if (salaryType === 'DAILY_WAGE') {
-            const preview = await buildDailyWagePreview(empId, periodStart, periodEnd, personalRate);
+            const rules = await getDepartmentRulesForEmployee(empId);
+            const preview = await buildDailyWagePreview(empId, periodStart, periodEnd, personalRate, rules);
             grossAmount = preview.grossAmount;
             workingDays = preview.workingDays;
+            averageDailyRate = preview.averageDailyRate;
+            paidLeaveDaysApplied = preview.paidLeaveDaysApplied;
+            fullAttendanceBonusApplied = preview.fullAttendanceBonusApplied;
+            ruleGrossAddition = preview.ruleGrossAddition;
           } else {
             const fixed = await buildFixedPreview(empId, periodStart, periodEnd, baseSalary);
             grossAmount = fixed.grossAmount;
@@ -308,7 +402,12 @@ export const batchPreview = async (req: AuthRequest, res: Response): Promise<voi
           const bonusNum = Number(bonus) || 0;
           const calculatedNet = grossAmount - absentDeduction - advanceDeductions - loans.total + bonusNum;
 
-          return { employeeId: empId, salaryType, releaseType, workingDays, grossAmount, absentDeduction, advanceDeductions, loanDeductions: loans.total, bonus: bonusNum, calculatedNet, releasedAmount: calculatedNet };
+          return {
+            employeeId: empId, salaryType, releaseType, workingDays, grossAmount,
+            absentDeduction, advanceDeductions, loanDeductions: loans.total, bonus: bonusNum,
+            calculatedNet, releasedAmount: calculatedNet,
+            ...(salaryType === 'DAILY_WAGE' ? { averageDailyRate, paidLeaveDaysApplied, fullAttendanceBonusApplied, ruleGrossAddition } : {}),
+          };
         } catch (e: any) {
           return { employeeId: empId, error: e.message };
         }
@@ -340,7 +439,8 @@ export const createRelease = async (req: AuthRequest, res: Response): Promise<vo
     let absentDeduction = 0;
 
     if (salaryType === 'DAILY_WAGE') {
-      const preview = await buildDailyWagePreview(employeeId, periodStart, periodEnd, personalRate);
+      const rules = await getDepartmentRulesForEmployee(employeeId);
+      const preview = await buildDailyWagePreview(employeeId, periodStart, periodEnd, personalRate, rules);
       grossAmount = preview.grossAmount;
       workingDays = preview.workingDays;
     } else {
@@ -403,7 +503,8 @@ export const batchCreateReleases = async (req: AuthRequest, res: Response): Prom
           let absentDeduction = 0;
 
           if (salaryType === 'DAILY_WAGE') {
-            const preview = await buildDailyWagePreview(empId, periodStart, periodEnd, personalRate);
+            const rules = await getDepartmentRulesForEmployee(empId);
+            const preview = await buildDailyWagePreview(empId, periodStart, periodEnd, personalRate, rules);
             grossAmount = preview.grossAmount;
             workingDays = preview.workingDays;
           } else {
@@ -511,8 +612,9 @@ export const getRelease = async (req: AuthRequest, res: Response): Promise<void>
     let dayBreakdown: DayEntry[] = [];
     if (release.salary_type === 'DAILY_WAGE') {
       const { personalRate } = await getEffectiveRate(release.employee_id);
+      const rules = await getDepartmentRulesForEmployee(release.employee_id);
       const preview = await buildDailyWagePreview(
-        release.employee_id, release.period_start, release.period_end, personalRate
+        release.employee_id, release.period_start, release.period_end, personalRate, rules
       );
       dayBreakdown = preview.dayBreakdown;
     }

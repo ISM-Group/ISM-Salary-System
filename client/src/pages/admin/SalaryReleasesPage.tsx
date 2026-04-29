@@ -29,6 +29,9 @@ type PreviewData = {
   excessAbsent?: number;
   dayBreakdown?: DayEntry[];
   averageDailyRate?: number;
+  paidLeaveDaysApplied?: number;
+  fullAttendanceBonusApplied?: boolean;
+  ruleGrossAddition?: number;
   error?: string;
 };
 
@@ -40,6 +43,7 @@ type DayEntry = {
   roleDailyWage: number;
   effectiveRate: number;
   amount: number;
+  paidLeave?: boolean;
 };
 
 type Release = {
@@ -420,13 +424,19 @@ export function SalaryReleasesPage() {
                       </TableHeader>
                       <TableBody>
                         {detail.dayBreakdown.map((d: DayEntry) => (
-                          <TableRow key={d.date} className={d.status === 'ABSENT' ? 'opacity-40' : ''}>
+                          <TableRow key={d.date} className={d.paidLeave ? 'bg-green-50' : d.status === 'ABSENT' ? 'opacity-40' : ''}>
                             <TableCell className="text-xs">{d.date}</TableCell>
                             <TableCell className="text-xs">{d.roleName || '-'}</TableCell>
                             <TableCell className="font-mono text-xs">{formatCurrency(d.personalRate)}</TableCell>
                             <TableCell className="font-mono text-xs">{formatCurrency(d.roleDailyWage)}</TableCell>
                             <TableCell className="font-mono text-xs font-medium">{formatCurrency(d.effectiveRate)}</TableCell>
-                            <TableCell className="font-mono text-xs">{d.status === 'PRESENT' ? formatCurrency(d.amount) : 'Absent'}</TableCell>
+                            <TableCell className="font-mono text-xs">
+                              {d.status === 'PRESENT'
+                                ? formatCurrency(d.amount)
+                                : d.paidLeave
+                                  ? <span className="text-green-700">{formatCurrency(d.amount)} <span className="text-xs opacity-75">(paid leave)</span></span>
+                                  : 'Absent'}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -542,6 +552,18 @@ export function SalaryReleasesPage() {
                             {p.salaryType === 'DAILY_WAGE' && p.averageDailyRate !== undefined && (
                               <div><span className="text-gray-500">Avg Daily Rate</span><div className="font-mono">{formatCurrency(p.averageDailyRate)}</div></div>
                             )}
+                            {(p.paidLeaveDaysApplied ?? 0) > 0 && (
+                              <div className="col-span-3 flex items-center gap-2 rounded bg-green-50 border border-green-200 px-3 py-1.5 text-sm text-green-800">
+                                <span className="font-medium">+{p.paidLeaveDaysApplied} paid leave day{p.paidLeaveDaysApplied! > 1 ? 's' : ''}</span>
+                                <span className="text-green-600">· +{formatCurrency(p.ruleGrossAddition ?? 0)}</span>
+                              </div>
+                            )}
+                            {p.fullAttendanceBonusApplied && (
+                              <div className="col-span-3 flex items-center gap-2 rounded bg-green-50 border border-green-200 px-3 py-1.5 text-sm text-green-800">
+                                <span className="font-medium">Full attendance bonus</span>
+                                <span className="text-green-600">· +{formatCurrency(p.ruleGrossAddition ?? 0)}</span>
+                              </div>
+                            )}
                             <div><span className="text-gray-500">Advances</span><div className="font-mono text-red-600">-{formatCurrency(p.advanceDeductions)}</div></div>
                             <div><span className="text-gray-500">Loans</span><div className="font-mono text-red-600">-{formatCurrency(p.loanDeductions)}</div></div>
                             <div><span className="text-gray-500">Bonus</span><div className="font-mono text-green-600">+{formatCurrency(p.bonus)}</div></div>
@@ -584,13 +606,19 @@ export function SalaryReleasesPage() {
                               </TableHeader>
                               <TableBody>
                                 {p.dayBreakdown.map((d) => (
-                                  <TableRow key={d.date} className={d.status === 'ABSENT' ? 'opacity-40' : ''}>
+                                  <TableRow key={d.date} className={d.paidLeave ? 'bg-green-50' : d.status === 'ABSENT' ? 'opacity-40' : ''}>
                                     <TableCell className="text-xs">{d.date}</TableCell>
                                     <TableCell className="text-xs">{d.roleName || '-'}</TableCell>
                                     <TableCell className="font-mono text-xs">{formatCurrency(d.personalRate)}</TableCell>
                                     <TableCell className="font-mono text-xs">{formatCurrency(d.roleDailyWage)}</TableCell>
                                     <TableCell className="font-mono text-xs font-medium">{formatCurrency(d.effectiveRate)}</TableCell>
-                                    <TableCell className="font-mono text-xs">{d.status === 'PRESENT' ? formatCurrency(d.amount) : 'Absent'}</TableCell>
+                                    <TableCell className="font-mono text-xs">
+                                      {d.status === 'PRESENT'
+                                        ? formatCurrency(d.amount)
+                                        : d.paidLeave
+                                          ? <span className="text-green-700">{formatCurrency(d.amount)} <span className="text-xs opacity-75">(paid leave)</span></span>
+                                          : 'Absent'}
+                                    </TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
